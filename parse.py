@@ -29,21 +29,22 @@ def make_linear_fsa(input_str):
 
 def main(args):
     wcfg = FrozenWCFG(read_grammar_rules(args.grammar))
-    print 'GRAMMAR'
-    print wcfg
+    #print 'GRAMMAR'
+    #print wcfg
 
     for input_str in args.input:
         wfsa = make_linear_fsa(input_str)
-        print 'FSA'
-        print wfsa
+        #print 'FSA'
+        #print wfsa
         parser = Earley(wcfg, wfsa)
         status, R = parser.do('[S]', '[GOAL]')
         if not status:
             print 'NO PARSE FOUND'
             continue
         forest = FrozenWCFG(R)
-        print 'FOREST'
+        print '# FOREST'
         print forest
+        print 
 
 
 
