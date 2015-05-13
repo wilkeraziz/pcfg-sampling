@@ -10,9 +10,10 @@ from math import log
 
 class WCFG(object):
 
-    def __init__(self):
-        self._rules = []
+    def __init__(self, rules=[]):
+        self._rules = list(rules)
         self._rules_by_lhs = defaultdict(list)
+        [self._rules_by_lhs[rule.lhs].append(rule) for rule in self._rules]
 
     def add_rule(self, rule):
         self._rules.append(rule)
