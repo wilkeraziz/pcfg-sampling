@@ -2,14 +2,16 @@
 @author wilkeraziz
 """
 
-import logging
-import itertools
 import argparse
 import sys
+
 from rule import Rule
 from wcfg import FrozenWCFG
 from wfsa import WDFSA
 from earley import Earley
+from topSort import TopSort
+from inside import Inside
+
 
 def read_grammar_rules(istream):
     for line in istream:
@@ -29,13 +31,13 @@ def make_linear_fsa(input_str):
 
 def main(args):
     wcfg = FrozenWCFG(read_grammar_rules(args.grammar))
-    print 'GRAMMAR'
-    print wcfg
+    # print 'GRAMMAR'
+    # print wcfg
 
     for input_str in args.input:
         wfsa = make_linear_fsa(input_str)
-        print 'FSA'
-        print wfsa
+        # print 'FSA'
+        # print wfsa
         parser = Earley(wcfg, wfsa)
         status, R = parser.do('[S]', '[GOAL]')
         if not status:
@@ -44,6 +46,21 @@ def main(args):
         forest = FrozenWCFG(R)
         print 'FOREST'
         print forest
+
+        top_sort = TopSort(forest)
+        sorted_forest = top_sort.top_sort()
+
+        print "\nSORTED FOREST", sorted_forest
+
+        inside = Inside(forest, sorted_forest)
+        inside_prob = inside.inside()
+
+        print "\n------------------------------------- \nINSIDE PROBS:\n"
+        for prob, v in inside_prob.iteritems():
+            print prob, v
+
+
+
 
 
 
@@ -61,7 +78,7 @@ def argparser():
     parser.add_argument('input', nargs='?', 
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
-    #parser.add_argument('output', nargs='?', 
+    #parser.add_argument('output', nargs='?',
     #        type=argparse.FileType('w'), default=sys.stdout,
     #        help='parse trees')
     parser.add_argument('--verbose', '-v',

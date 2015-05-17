@@ -45,5 +45,5 @@ class Rule(object):
 
     @property
     def prob(self):
-        return math.exp(self.log_prob_)
+        return Math.exp(self.log_prob_)
 

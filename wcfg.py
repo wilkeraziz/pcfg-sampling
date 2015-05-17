@@ -49,4 +49,5 @@ class FrozenWCFG(object):
         for lhs, rules in self.iteritems():
             for rule in rules:
                 lines.append(str(rule))
+        # print "WUUUUT"'\n'.join(lines)
         return '\n'.join(lines)
