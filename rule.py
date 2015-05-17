@@ -26,7 +26,7 @@ class Rule(object):
     def __hash__(self):
         return hash((self.lhs_, self.rhs_, self.log_prob_))
 
-    def __str__(self):
+    def __repr__(self):
         return '%s -> %s (%s)' % (self.lhs_,
                 ' '.join(str(sym) for sym in self.rhs_),
                 self.log_prob_)

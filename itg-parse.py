@@ -2,16 +2,15 @@
 @author wilkeraziz
 """
 
+import logging
+import itertools
 import argparse
 import sys
-
 from rule import Rule
-from wcfg import FrozenWCFG
+from symbol import is_nonterminal, is_terminal
+from wcfg import FrozenWCFG, WCFG, count_derivations
 from wfsa import WDFSA
 from earley import Earley
-from topSort import TopSort
-from inside import Inside
-
 
 def read_grammar_rules(istream):
     for line in istream:
@@ -30,40 +29,38 @@ def make_linear_fsa(input_str):
     return wfsa
 
 def main(args):
-    wcfg = FrozenWCFG(read_grammar_rules(args.grammar))
-
-    # print 'GRAMMAR'
-    # print wcfg
+    wcfg = WCFG(read_grammar_rules(args.grammar))
+    #print 'GRAMMAR'
+    #print wcfg
 
     for input_str in args.input:
         wfsa = make_linear_fsa(input_str)
-        # print 'FSA'
-        # print wfsa
-
+        #print 'FSA'
+        #print wfsa
         parser = Earley(wcfg, wfsa)
         status, R = parser.do('[S]', '[GOAL]')
         if not status:
             print 'NO PARSE FOUND'
             continue
-        forest = FrozenWCFG(R)
+        forest = WCFG()
+        for rule in R:
+            forest.add_rule(rule)
+            #continue
+            if len(rule.rhs) > 1 and all(map(is_nonterminal, rule.rhs)):
+                forest.add_rule(Rule(rule.lhs, reversed(rule.rhs), rule.log_prob))
         print '# FOREST'
         print forest
-        print 
+        print
 
-        top_sort = TopSort(forest)
-        sorted_forest = top_sort.top_sort()
-
-        print "\nSORTED FOREST", sorted_forest
-
-        inside = Inside(forest, sorted_forest)
-        inside_prob = inside.inside()
-
-        print "\n------------------------------------- \nINSIDE PROBS:\n"
-        for prob, v in inside_prob.iteritems():
-            print prob, v
-
-
-
+        if args.show_permutations:
+            print '# PERMUTATIONS'
+            counts = count_derivations(forest, '[GOAL]')
+            total = 0
+            for p, n in sorted(counts['p'].iteritems(), key=lambda (k, v): k):
+                print 'permutation=(%s) derivations=%d' % (' '.join(str(i) for i in p), n)
+                total += n
+            print 'permutations=%d derivations=%d' % (len(counts['p'].keys()), total)
+            print
 
 
 
@@ -81,9 +78,9 @@ def argparser():
     parser.add_argument('input', nargs='?', 
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
-    #parser.add_argument('output', nargs='?',
-    #        type=argparse.FileType('w'), default=sys.stdout,
-    #        help='parse trees')
+    parser.add_argument('--show-permutations',
+            action='store_true',
+            help='dumps all permutations (use with caution)')
     parser.add_argument('--verbose', '-v',
             action='store_true',
             help='increase the verbosity level')
