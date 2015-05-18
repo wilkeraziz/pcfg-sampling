@@ -1,6 +1,7 @@
 __author__ = 'Iason'
 
 from topSort import get_bs
+import math
 
 
 class Inside(object):
@@ -28,9 +29,11 @@ class Inside(object):
 
             # leaves have inside weight 1
             if len(incoming) < 1:
-                inside_prob[q] = 1
-            else:
+                # log(1) = 0
                 inside_prob[q] = 0
+            else:
+                # log(0) = -inf
+                inside_prob[q] = -float("inf")
 
                 # total inside weight of an incoming edge
                 for bs in incoming:
@@ -41,10 +44,12 @@ class Inside(object):
                         print "edge", e
 
                         # including the edge own weight
-                        k = k * inside_prob[e]
+                        # log(a * b) = log(a) + log(b)
+                        k = k + inside_prob[e]
                         print "updated K = ", k, "\n"
 
-                    inside_prob[q] = inside_prob[q] + k
+                    # log(a) + log(b) = log(exp(a) + exp(b))
+                    inside_prob[q] = math.log(math.exp(inside_prob[q]) + math.exp(k))
 
             print "INSIDE prob of ", q, " = ", inside_prob[q]
 
