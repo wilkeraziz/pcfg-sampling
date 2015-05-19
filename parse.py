@@ -11,6 +11,7 @@ from wfsa import WDFSA
 from earley import Earley
 from topSort import TopSort
 from inside import Inside
+from generalisedSampling import GeneralisedSampling
 
 
 def read_grammar_rules(istream):
@@ -46,14 +47,22 @@ def main(args):
             print 'NO PARSE FOUND'
             continue
         forest = FrozenWCFG(R)
+
         print '# FOREST'
         print forest
-        print 
+        print
 
         top_sort = TopSort(forest)
         sorted_forest = top_sort.top_sort()
 
-        print "\nSORTED FOREST", sorted_forest
+        # print "\nSORTED FOREST", sorted_forest
+
+        print "\n------------------------------------- \nTOP SORTED:\n"
+        rev_l = reversed(sorted_forest)
+        for meh in rev_l:
+            for r in forest:
+                if r.lhs == meh:
+                    print r
 
         inside = Inside(forest, sorted_forest)
         inside_prob = inside.inside()
@@ -62,9 +71,41 @@ def main(args):
         for prob, v in inside_prob.iteritems():
             print prob, v
 
+        gen_sampling = GeneralisedSampling(forest, inside_prob)
+        sampled = gen_sampling.sample()
+
+        print "\n------------------------------------- \nSAMPLED DERIVATION:\n"
+        for s in sampled:
+            print s
 
 
+        """--------------------------------------------------------------
+        Temporary, only works with examples/cfg and sentence: "the cat drinks"
+        It calculates the ratio between the two possible derivations,
+        for checking purposes.
+        """
+        """
+        c1 = 0
+        c2 = 0
 
+        for i in range(10000):
+            gen_sampling = GeneralisedSampling(forest, inside_prob)
+            sampled = gen_sampling.sample()
+
+            if str(sampled[1]) == '[S,0-3] -> [NP,0-2] [VP,2-3] (-0.3566)':
+                c1 += 1
+
+            elif str(sampled[1]) == '[S,0-3] -> [NP,0-3] (-1.2039)':
+                c2 += 2
+
+        print "DER 1 ([S,0-3] -> [NP,0-2] [VP,2-3] (-0.3566) . . . ) occurs: ", c1
+        print "DER 2 ([S,0-3] -> [NP,0-3] (-1.2039) . . . ) occurs: ", c2
+
+        ratio_c1 = (float(c1) / (c1 + c2)) * 100
+        ratio_c2 = (float(c2) / (c1 + c2)) * 100
+        print "Ratio: Der 1: ", ratio_c1, "%"
+        print "Ratio: Der 2: ", ratio_c2, "%"
+        ------------------------------------------------------------------"""
 
 
 def argparser():

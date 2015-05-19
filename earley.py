@@ -48,7 +48,7 @@ class Earley(object):
             it += 1
             item = agenda.pop()
 
-            if item.is_complete(): 
+            if item.is_complete():
                 status = self.complete_others(item)
 
                 # root symbol spanning from a start wfsa state to a final wfsa state

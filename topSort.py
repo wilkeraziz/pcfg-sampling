@@ -17,21 +17,6 @@ class TopSort(object):
         # L, top sorted nodes
         l = []
 
-        # TEMP PRINT V
-        print "\n--- V -------------------"
-        for item in v:
-            print item
-
-        # TEMP PRINT S
-        print "\n--- S-------------------"
-        for i in s:
-            print i
-
-        # TEMP PRINT D
-        print "\n--- D-------------------"
-        for i, dd in d.iteritems():
-            print i, dd
-
         while len(s) is not 0:
             # remove and return a node from S
             q = s.pop()
@@ -53,12 +38,6 @@ class TopSort(object):
                     del d[p]
                     s.append(p)
 
-        print "\n=== TOP SORTED ========================="
-        rev_l = reversed(l)
-        for meh in rev_l:
-            for r in forest:
-                if r.lhs == meh:
-                    print r
         return l
 
 """
