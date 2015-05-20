@@ -72,7 +72,7 @@ def main(args):
             print prob, v
 
         gen_sampling = GeneralisedSampling(forest, inside_prob)
-        sampled = gen_sampling.sample()
+        sampled = gen_sampling.sample('[GOAL]')
 
         print "\n------------------------------------- \nSAMPLED DERIVATION:\n"
         for s in sampled:
@@ -85,11 +85,18 @@ def main(args):
         for checking purposes.
         """
         """
+        print "\n\n-------------------------------------------------------------"
         c1 = 0
         c2 = 0
 
+        import time
+
+        start = time.time()
+        print "\nBEGIN TIME "
+
+        gen_sampling = GeneralisedSampling(forest, inside_prob)
         for i in range(10000):
-            gen_sampling = GeneralisedSampling(forest, inside_prob)
+
             sampled = gen_sampling.sample()
 
             if str(sampled[1]) == '[S,0-3] -> [NP,0-2] [VP,2-3] (-0.3566)':
@@ -105,6 +112,9 @@ def main(args):
         ratio_c2 = (float(c2) / (c1 + c2)) * 100
         print "Ratio: Der 1: ", ratio_c1, "%"
         print "Ratio: Der 2: ", ratio_c2, "%"
+
+        end = time.time()
+        print "\nEND TIME = ", end - start
         ------------------------------------------------------------------"""
 
 

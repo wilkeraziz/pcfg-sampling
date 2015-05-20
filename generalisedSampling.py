@@ -10,30 +10,25 @@ class GeneralisedSampling(object):
 
     def __init__(self, forest, inside_prob):
         self.forest = forest
-        self.inside_prob = inside_prob
+        self.inside = inside_prob
+        self.iq = dict()
 
     """
     the generalised sample algorithm
     """
-    def sample(self):
-        # print "\n\n============= SAMPLING ==============="
-        forest = self.forest
-        inside_prob = self.inside_prob
+    def sample(self, goal='[GOAL]'):
 
         # an empty partial derivation
         d = []
 
         # Q, a queue of nodes to be visited, starting from [GOAL]
-        q = ['[GOAL]']
+        q = [goal]
 
         while q:
             k = q.pop()
-            # print "\n============", k, "============"
 
             # select an edge
-            e = select(k, inside_prob, forest)
-
-            # print "\n\n====== selected edge = ", e
+            e = self.select(k)
 
             # add the edge to the partial derivation
             d.append(e)
@@ -45,57 +40,42 @@ class GeneralisedSampling(object):
 
         return d
 
-
-"""
-select method, draws a random edge with respect to the Inside weight distribution
-"""
-def select(k, inside, forest):
-    iq = dict()
-    k_bs = get_bs(k, forest)
-
-    # the inside weight of the parent node
-    ip = inside[k]
-
-    # calculate the Inside weight for each edge in BS of parent node
-    for b in k_bs:
-        # edge own weight
-        temp_iq = b.log_prob
-
-        # consider all of its tail nodes
-        for r in b.rhs:
-            temp_iq = temp_iq + inside[r]
-
-        iq[b] = temp_iq
-
     """
-    print "\n All Iq: "
-    for i, j in iq.iteritems():
-        print i, "Iq --> ", j
+    select method, draws a random edge with respect to the Inside weight distribution
     """
+    def select(self, k):
+        # self.iq = dict()
+        k_bs = get_bs(k, self.forest)
 
-    # print "\nNormalisation term = ", ip
+        # the inside weight of the parent node
+        ip = self.inside[k]
 
-    # select an edge randomly with respect to the distribution of the edges
-    # threshold for selecting an edge
-    threshold = math.log(random.uniform(0, math.exp(ip)))
+        # calculate the Inside weight for each edge in BS of parent node
+        for b in k_bs:
+            if b not in self.iq:
+                # edge own weight
+                temp_iq = b.log_prob
 
-    acc = -float("inf")
+                # consider all of its tail nodes
+                for r in b.rhs:
+                    temp_iq = temp_iq + self.inside[r]
 
-    for e in k_bs:
-        acc = math.log(math.exp(acc) + math.exp(iq[e]))
+                self.iq[b] = temp_iq
 
-        """
-        print "Thres =", threshold
-        print "Iq e: ", iq[e], "iq = ", iq[e]
-        print "cur edge = ", e
-        print "acc = ", acc
-        """
+        # select an edge randomly with respect to the distribution of the edges
+        # threshold for selecting an edge
+        threshold = math.log(random.uniform(0, math.exp(ip)))
 
-        if acc > threshold:
-            return e
+        acc = -float("inf")
 
-    # if there is not yet an edge returned for some rare rounding error,
-    # return the last edge, hence that is the edge closest to the threshold
-    return k_bs[-1]
+        for e in k_bs:
+            acc = math.log(math.exp(acc) + math.exp(self.iq[e]))
+
+            if acc > threshold:
+                return e
+
+        # if there is not yet an edge returned for some rare rounding error,
+        # return the last edge, hence that is the edge closest to the threshold
+        return k_bs[-1]
 
 
