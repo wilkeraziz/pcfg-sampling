@@ -7,6 +7,7 @@ import itertools
 import logging
 
 EMPTY_SET = frozenset()
+    
 
 
 class Agenda(object):
@@ -20,6 +21,7 @@ class Agenda(object):
         # and distinguished between 'complete' and 'waiting for completion'
         self._waiting_completion = collections.defaultdict(set)
         self._complete = collections.defaultdict(set)
+        self._generating = collections.defaultdict(lambda : collections.defaultdict(set))  # generating symbols: LHS -> start -> ends
 
         for item in active:
             self._active[item.uid] = True
@@ -29,6 +31,10 @@ class Agenda(object):
                 self._complete[(item.start, item.rule.lhs)].add(item.uid)
             else:
                 self._waiting_completion[(item.dot, item.next)].add(item.uid)
+
+    def itergenerating(self, lhs):
+        return self._generating.get(lhs, {}).iteritems()
+
 
     def __str__(self):
         lines = ['passive (incomplete)']
@@ -65,7 +71,7 @@ class Agenda(object):
         except:
             pass
         if item.is_complete():
-            self._complete[(item.start, item.rule.lhs)].add(item.uid)
+            self.complete(item)
         else:
             self._waiting_completion[(item.dot, item.next)].add(item.uid)
 
@@ -73,6 +79,7 @@ class Agenda(object):
         """Stores a complete state, this is syntactic sugar for makePassive in case the input state is complete."""
         assert item.is_complete(), 'This state is not complete: %s' % item
         self._complete[(item.start, item.rule.lhs)].add(item.uid)
+        self._generating[item.rule.lhs][item.start].add(item.dot)
 
     def itercomplete(self):
         """Iterates over the complete states in no particular order."""

@@ -8,20 +8,24 @@ import argparse
 import sys
 from rule import Rule
 from symbol import is_nonterminal, is_terminal
-from wcfg import WCFG, read_grammar_rules, count_derivations
+from wcfg import WCFG, count_derivations
 from wfsa import WDFSA, make_linear_fsa
 from earley import Earley
 
+def make_grammar(fsa):
+    cfg = WCFG()
+    cfg.add(Rule('[S]', ['[X]'], 0.0))
+    cfg.add(Rule('[X]', ['[X]', '[X]'], 0.0))
+    for word in fsa.itersymbols():
+        cfg.add(Rule('[X]', [word], 0.0))
+    return cfg
+
 def main(args):
-    wcfg = WCFG(read_grammar_rules(args.grammar))
-    #print 'GRAMMAR'
-    #print wcfg
 
     for input_str in args.input:
-        wfsa = make_linear_fsa(input_str)
-        #print 'FSA'
-        #print wfsa
-        parser = Earley(wcfg, wfsa)
+        fsa = make_linear_fsa(input_str)
+        cfg = make_grammar(fsa)
+        parser = Earley(cfg, fsa)
         forest = parser.do('[S]', '[GOAL]')
         if not forest:
             print 'NO PARSE FOUND'
@@ -35,15 +39,14 @@ def main(args):
         print forest
         print
 
-        if args.show_permutations:
-            print '# PERMUTATIONS'
-            counts = count_derivations(forest, '[GOAL]')
-            total = 0
-            for p, n in sorted(counts['p'].iteritems(), key=lambda (k, v): k):
-                print 'permutation=(%s) derivations=%d' % (' '.join(str(i) for i in p), n)
-                total += n
-            print 'permutations=%d derivations=%d' % (len(counts['p'].keys()), total)
-            print
+        counts = count_derivations(forest, '[GOAL]')
+        #for d, n in counts['d'].iteritems():
+        #    print ' ||| '.join(str(r) for r in d), n
+        total = 0
+        for p, n in sorted(counts['p'].iteritems(), key=lambda (k, v): k):
+            print p, n
+            total += n
+        print len(counts['p'].keys()), total
 
 
 
@@ -52,18 +55,15 @@ def argparser():
 
     parser = argparse.ArgumentParser(prog='parse')
 
-    parser.description = 'Earley parser'
+    parser.description = 'Binarizable permutations'
     parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
 
-    parser.add_argument('grammar',  
-            type=argparse.FileType('r'), 
-            help='CFG rules')
     parser.add_argument('input', nargs='?', 
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
-    parser.add_argument('--show-permutations',
-            action='store_true',
-            help='dumps all permutations (use with caution)')
+    #parser.add_argument('output', nargs='?', 
+    #        type=argparse.FileType('w'), default=sys.stdout,
+    #        help='parse trees')
     parser.add_argument('--verbose', '-v',
             action='store_true',
             help='increase the verbosity level')

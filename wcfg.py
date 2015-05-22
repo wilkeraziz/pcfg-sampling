@@ -11,14 +11,18 @@ from math import log
 class WCFG(object):
 
     def __init__(self, rules=[]):
-        self._rules = list(rules)
+        self._rules = []
         self._rules_by_lhs = defaultdict(list)
-        [self._rules_by_lhs[rule.lhs].append(rule) for rule in self._rules]
+        for rule in rules:
+            self.add(rule)
 
-    def add_rule(self, rule):
+    def add(self, rule):
         self._rules.append(rule)
         self._rules_by_lhs[rule.lhs].append(rule)
 
+    def __len__(self):
+        return len(self._rules)
+
     def __getitem__(self, lhs):
         return self._rules_by_lhs.get(lhs, frozenset())
 
@@ -33,33 +37,6 @@ class WCFG(object):
         for lhs, rules in self.iteritems():
             for rule in rules:
                 lines.append(str(rule))
-        return '\n'.join(lines)
-
-class FrozenWCFG(object):
-
-    def __init__(self, rules):
-        self._rules = tuple(rules)
-        helper = defaultdict(list)
-        [helper[rule.lhs].append(rule) for rule in self._rules]
-        self._rules_by_lhs = defaultdict(None)
-        for lhs, entries in helper.iteritems():
-            self._rules_by_lhs[lhs] = frozenset(entries)
-
-    def __getitem__(self, lhs):
-        return self._rules_by_lhs.get(lhs, frozenset())
-
-    def __iter__(self):
-        return iter(self._rules)
-
-    def iteritems(self):
-        return self._rules_by_lhs.iteritems()
-    
-    def __str__(self):
-        lines = []
-        for lhs, rules in self.iteritems():
-            for rule in rules:
-                lines.append(str(rule))
-        # print "WUUUUT"'\n'.join(lines)
         return '\n'.join(lines)
 
 

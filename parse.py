@@ -6,32 +6,17 @@ import argparse
 import sys
 
 from rule import Rule
-from wcfg import FrozenWCFG
-from wfsa import WDFSA
+from wcfg import WCFG, read_grammar_rules
+from wfsa import WDFSA, make_linear_fsa
 from earley import Earley
 from topSort import TopSort
 from inside import Inside
 from generalisedSampling import GeneralisedSampling
+from symbol import parse_annotated_nonterminal
 
-
-def read_grammar_rules(istream):
-    for line in istream:
-        lhs, rhs, log_prob = line.strip().split(' ||| ')
-        rhs = rhs.split()
-        log_prob = float(log_prob)
-        yield Rule(lhs, rhs, log_prob)
-
-def make_linear_fsa(input_str):
-    wfsa = WDFSA()
-    tokens = input_str.split()
-    for i, token in enumerate(tokens):
-        wfsa.add_arc(i, i + 1, token)
-    wfsa.make_initial(0)
-    wfsa.make_final(len(tokens))
-    return wfsa
 
 def main(args):
-    wcfg = FrozenWCFG(read_grammar_rules(args.grammar))
+    wcfg = WCFG(read_grammar_rules(args.grammar))
 
     # print 'GRAMMAR'
     # print wcfg
@@ -42,12 +27,10 @@ def main(args):
         # print wfsa
 
         parser = Earley(wcfg, wfsa)
-        status, R = parser.do('[S]', '[GOAL]')
-        if not status:
+        forest = parser.do('[S]', '[GOAL]')
+        if not forest:
             print 'NO PARSE FOUND'
             continue
-        forest = FrozenWCFG(R)
-
         print '# FOREST'
         print forest
         print

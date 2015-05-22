@@ -7,8 +7,11 @@ from item import ItemFactory
 from agenda import Agenda
 from bisect import bisect_left
 from collections import defaultdict
-from symbol import is_terminal, make_symbol
+from symbol import is_terminal, make_symbol, is_nonterminal
 from rule import Rule
+from wcfg import WCFG
+import collections
+from itertools import ifilter
 
 class Earley(object):
 
@@ -89,14 +92,7 @@ class Earley(object):
                 # this should happen only with unreachable states
 
         # the intersected grammar
-        if new_roots:
-            # converts complete items into rules
-            R = set(self.get_intersected_rules())
-            for sym, si, sf in new_roots:
-                R.add(Rule(goal, [make_symbol(sym, si, sf)], 0.0))
-            return True, R
-        else:
-            return False, frozenset()
+        return self.get_cfg(root, goal)
 
     def axioms(self, symbol, start):
         rules = self._wcfg[symbol]
@@ -203,9 +199,41 @@ class Earley(object):
         rule = self._rfactory.getRule(item.rule.lhs, item.rule.rhs, elementwisesum(item.features_, h))
         return self._ifactory.getItem(rule, sto, item.inner_ + array('B', [item.dot_]))
 
-    def get_intersected_rules(self):
+    def get_intersected_rule(self, item):
+        lhs = make_symbol(item.rule.lhs, item.start, item.dot)
+        positions = item.inner + (item.dot,)
+        rhs = [make_symbol(sym, positions[i], positions[i + 1]) for i, sym in enumerate(item.rule.rhs)] 
+        return Rule(lhs, rhs, item.rule.log_prob)
+    
+    def get_cfg(self, root, goal):
+        """This version is non-recursive (it uses a deque)."""
+        G = WCFG()
+        queuing = set()  # output symbols queuing (or that have already left the queue)
+        Q = collections.deque()  # queue of LHS annotated symbols whose rules are to be created
+
+        # organise complete items by annotated lhs symbols
+        complete = defaultdict(list)
         for item in self._agenda.itercomplete():
-            lhs = make_symbol(item.rule.lhs, item.start, item.dot)
-            positions = item.inner + (item.dot,)
-            rhs = [make_symbol(sym, positions[i], positions[i + 1]) for i, sym in enumerate(item.rule.rhs)] 
-            yield Rule(lhs, rhs, item.rule.log_prob)
+            complete[(item.rule.lhs, item.start, item.dot)].append(item)
+
+        # first we create rules for the roots
+        for start, ends in self._agenda.itergenerating(root):
+            if not self._wfsa.is_initial(start):  # must span from an initial state
+                continue
+            for end in ifilter(lambda q: self._wfsa.is_final(q), ends):  # to a final state
+                Q.append((root, start, end)) 
+                queuing.add((root, start, end)) 
+                G.add(Rule(goal, [make_symbol(root, start, end)], 0.0))
+        
+        # create rules for symbols which are reachable from other generating symbols (starting from the root ones)
+        while Q:
+            (lhs, start, end) = Q.pop()
+            for item in complete.get((lhs, start, end), []):
+                rule = self.get_intersected_rule(item)
+                G.add(rule)
+                fsa_states = item.inner + (item.dot,)
+                for i, sym in ifilter(lambda (_, s): is_nonterminal(s), enumerate(item.rule.rhs)):
+                    if (sym, fsa_states[i], fsa_states[i + 1]) not in queuing:  # make sure the same symbol never queues more than once
+                        Q.append((sym, fsa_states[i], fsa_states[i + 1]))
+                        queuing.add((sym, fsa_states[i], fsa_states[i + 1]))
+        return G

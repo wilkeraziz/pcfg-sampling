@@ -3,6 +3,9 @@
 """
 
 from weakref import WeakValueDictionary
+import re
+
+NT_RE = re.compile('\[(.+),([0-9]+)-([0-9]+)\]')
 
 def is_terminal(symbol):
     """nonterminals are formatted as this: [X]"""
@@ -16,6 +19,19 @@ def is_nonterminal(symbol):
 
 def make_symbol(base_symbol, sfrom, sto):
     return base_symbol if is_terminal(base_symbol) else '[%s,%d-%d]' % (base_symbol[1:-1], sfrom, sto)
+
+def parse_annotated_nonterminal(nt):
+    m = NT_RE.match(nt)
+    if m is None:
+        return nt, None, None
+    else:
+        return '[{0}]'.format(m.group(1)), m.group(2), m.group(3)
+    
+def _make_symbol(base_symbol, sfrom, sto, structured=True):
+    if not structured:
+        return base_symbol if is_terminal(base_symbol) else '[%s,%d-%d]' % (base_symbol[1:-1], sfrom, sto)
+    else:
+        return base_symbol if is_terminal(base_symbol) else (base_symbol[1:-1], sfrom, sto)
 
 
 class Terminal(object):
