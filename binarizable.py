@@ -39,14 +39,13 @@ def main(args):
         print forest
         print
 
-        counts = count_derivations(forest, '[GOAL]')
-        #for d, n in counts['d'].iteritems():
-        #    print ' ||| '.join(str(r) for r in d), n
-        total = 0
-        for p, n in sorted(counts['p'].iteritems(), key=lambda (k, v): k):
-            print p, n
-            total += n
-        print len(counts['p'].keys()), total
+        if args.show_permutations:
+            counts = count_derivations(forest, '[GOAL]')
+            total = 0
+            for p, n in sorted(counts['p'].iteritems(), key=lambda (k, v): k):
+                print p, n
+                total += n
+            print len(counts['p'].keys()), total
 
 
 
@@ -64,6 +63,9 @@ def argparser():
     #parser.add_argument('output', nargs='?', 
     #        type=argparse.FileType('w'), default=sys.stdout,
     #        help='parse trees')
+    parser.add_argument('--show-permutations', 
+            action='store_true',
+            help='enumerate permutations (use with care)')
     parser.add_argument('--verbose', '-v',
             action='store_true',
             help='increase the verbosity level')
