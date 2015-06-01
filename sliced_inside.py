@@ -40,7 +40,6 @@ class SlicedInside(object):
                 for bs in incoming:
                     # replaced "k = bs.log_prob" for:
                     if not q == self.goal:
-                        """ Question 3: is this the correct beta.pdf function? """
                         u = self.slice_variables[parse_annotated_nonterminal(bs.lhs)]
                         k = math.log(1 / beta.pdf(math.exp(u), self.a, self.b))
 

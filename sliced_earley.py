@@ -240,9 +240,9 @@ class SlicedEarley(object):
             if item.rule.lhs == root:
                 check_root = True
 
-        # if there is no root, return []
+        # if there is no root, return False
         if check_root is False:
-            return []
+            return False
 
         # initial and final fsa states of the sentence
         initial_state = next(iter(self._agenda.itergenerating(root)))[0]
