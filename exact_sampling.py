@@ -3,7 +3,9 @@ __author__ = 'Iason'
 import argparse
 import sys
 
-from wcfg import WCFG, read_grammar_rules
+from reader import load_grammar
+from wcfg import WCFG
+from symbol import make_nonterminal
 from wfsa import make_linear_fsa
 from earley import Earley
 from topSort import TopSort
@@ -18,6 +20,7 @@ form of MC-sampling
 def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
     samples = dict()
 
+    print >> sys.stderr, 'Parsing...'
     parser = Earley(wcfg, wfsa)
     forest = parser.do(root, goal)
 
@@ -25,6 +28,7 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
         print 'NO PARSE FOUND'
         return False
     else:
+        print >> sys.stderr, 'Sampling...'
         # sort the forest
         top_sort = TopSort(forest)
         sorted_forest = top_sort.top_sort()
@@ -38,7 +42,7 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
         it = 0
         while sum(samples.values()) < n:
             it += 1
-            if it % (n / 10) == 0:
+            if it % 10 == 0:
                 print it, "/", n
 
             # retrieve a random derivation, with respect to the inside weight distribution
@@ -54,19 +58,25 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
         print der, occ
 
 
-def main(args):
-    wcfg = WCFG(read_grammar_rules(args.grammar))
-    # print 'GRAMMAR \n', wcfg
 
+
+def main(args):
+    print >> sys.stderr, 'Loading grammar'
+    wcfg = load_grammar(args.grammar, args.grammarfmt)
+    #print 'GRAMMAR \n', wcfg
+    print >> sys.stderr, ' %d rules' % len(wcfg)
+
+    start_symbol = make_nonterminal(args.start)
+    goal_symbol = make_nonterminal(args.goal)
     for input_str in args.input:
         wfsa = make_linear_fsa(input_str)
         # print 'FSA\n', wfsa
 
         import time
         start = time.time()
-
+        
         # exact_sample(wcfg, wfsa, '[S]', '[GOAL]', 10)
-        exact_sample(wcfg, wfsa, '[S]', '[GOAL]', args.n)
+        exact_sample(wcfg, wfsa, start_symbol, goal_symbol, args.n)
 
         end = time.time()
         print "DURATION  = ", end - start
@@ -81,11 +91,20 @@ def argparser():
     parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
 
     parser.add_argument('grammar',
-            type=argparse.FileType('r'),
-            help='CFG rules')
+            type=str,
+            help='path to CFG rules (or prefix in case of discodop format)')
     parser.add_argument('input', nargs='?',
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
+    parser.add_argument('--start',
+            type=str, default='S', 
+            help="start symbol of the grammar")
+    parser.add_argument('--goal',
+            type=str, default='GOAL', 
+            help="goal symbol for intersection")
+    parser.add_argument('--grammarfmt',
+            type=str, default='bar', choices=['bar', 'discodop'],
+            help="grammar format ('bar' is the native format)")
     parser.add_argument('--verbose', '-v',
             action='store_true',
             help='increase the verbosity level')

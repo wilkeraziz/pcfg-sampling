@@ -2,6 +2,7 @@
 @author wilkeraziz
 """
 
+import sys
 import logging
 from item import ItemFactory
 from agenda import Agenda
