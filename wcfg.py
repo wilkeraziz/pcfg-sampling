@@ -13,18 +13,45 @@ class WCFG(object):
     def __init__(self, rules=[]):
         self._rules = []
         self._rules_by_lhs = defaultdict(list)
+        self._terminals = set()
+        self._nonterminals = set()
         for rule in rules:
             self.add(rule)
 
     def add(self, rule):
         self._rules.append(rule)
         self._rules_by_lhs[rule.lhs].append(rule)
+        self._nonterminals.add(rule.lhs)
+        for s in rule.rhs:
+            if is_terminal(s):
+                self._terminals.add(s)
+            else:
+                self._nonterminals.add(s)
+
+    @property
+    def nonterminals(self):
+        return self._nonterminals
+
+    @property
+    def terminals(self):
+        return self._terminals
 
     def __len__(self):
         return len(self._rules)
 
     def __getitem__(self, lhs):
         return self._rules_by_lhs.get(lhs, frozenset())
+
+    def get(self, lhs, default=frozenset()):
+        return self._rules_by_lhs.get(lhs, frozenset())
+
+    def can_rewrite(self, lhs):
+        """Whether a given nonterminal can be rewritten.
+
+        This may differ from ``self.is_nonterminal(symbol)`` which returns whether a symbol belongs
+        to the set of nonterminals of the grammar.
+        """
+        return lhs in self._rules_by_lhs
 
     def __iter__(self):
         return iter(self._rules)

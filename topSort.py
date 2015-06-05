@@ -1,109 +1,46 @@
 __author__ = 'Iason'
 
+from collections import defaultdict, deque
 
-class TopSort(object):
 
-    def __init__(self, forest):
-        self.forest = forest
-
+def top_sort(forest):
     """
-    The actual top sort algorithm
+    Partial ordering of nodes in the forest.
+    :return: list of nodes ordered from leaves to root
     """
-    def top_sort(self):
-        forest = self.forest
-        v = get_v(forest)
-        s, d = get_sd(v, forest)
 
-        # L, top sorted nodes
-        l = []
+    dependencies = defaultdict(set)
+    dependants = defaultdict(set)
+    for lhs, rules in forest.iteritems():
+        for rule in rules:
+            dependencies[lhs].update(rule.rhs)
+            for s in rule.rhs:
+                dependants[s].add(lhs)
 
-        while len(s) is not 0:
-            # remove and return a node from S
-            q = s.pop()
+    sorting = deque(forest.terminals)
 
-            # append q to L
-            l.append(q)
+    # L, top ordered nodes
+    ordered = []
 
-            # outgoing edges from q
-            temp_fs = get_fs(q, forest)
-            for e in temp_fs:
-                # parent of q in e
-                p = e.lhs
+    while sorting:
+        # remove and return a node from sorting
+        node = sorting.popleft()
 
-                # remove q from D(p)
-                d[p].remove(q)
+        # append node to L
+        ordered.append(node)
 
-                # if p's dependencies have been sorted
-                if len(d[p]) < 1:
-                    del d[p]
-                    s.append(p)
+        parents = dependants.get(node, None)
+        if parents:
+            for parent in parents:
+                deps = dependencies.get(parent, None)
+                if deps is not None:
+                    try:
+                        deps.remove(node)
+                    except KeyError:
+                        pass
+                    if len(deps) == 0:
+                        sorting.append(parent)
+                        del dependencies[parent]
 
-        return l
-
-"""
-create V = terminals + non-terminals
-"""
-def get_v(forest):
-    v = []
-
-    for rule in forest:
-        if not v.__contains__(rule.lhs):
-            v.append(rule.lhs)
-
-        for item in rule.rhs:
-            if not v.__contains__(item):
-                v.append(item)
-    return v
-
-"""
-The backward star of q, is the set of incoming edges to q.
-It is the set of all rules whose LHS is the non-terminal q,
-BS(q) = {e elem E: h[e] = q}
-"""
-def get_bs(q, forest):
-    bs = []
-
-    for rule in forest:
-        if rule.lhs == q:
-            bs.append(rule)
-
-    return bs
-
-"""
-The forward star of q, is the set of outgoing edges from q.
-It is the set of all rules that use q in their RHS
-FS(q) = {e elem E: q elem t[e]}
-"""
-def get_fs(q, forest):
-    fs = []
-
-    for rule in forest:
-        if rule.rhs.__contains__(q):
-            fs.append(rule)
-
-    return fs
-
-"""
-Get S and D, states without and with dependencies respectively
-"""
-def get_sd(v, forest):
-    s = []
-    d = dict()
-
-    for item in v:
-        temp_bs = get_bs(item, forest)
-        # create S, states without dependencies
-        if len(temp_bs) < 1:
-            s.append(item)
-
-        # create D, states with their direct dependencies
-        else:
-            d.update({item: []})
-
-            for bs in temp_bs:
-                for i in bs.rhs:
-                    d[item].append(i)
-
-    return s, d
-
+    return ordered
 

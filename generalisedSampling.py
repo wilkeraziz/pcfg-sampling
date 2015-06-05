@@ -1,6 +1,5 @@
 __author__ = 'Iason'
 
-from topSort import get_bs
 from symbol import is_nonterminal
 import math
 import random
@@ -45,7 +44,7 @@ class GeneralisedSampling(object):
     """
     def select(self, k):
         # self.iq = dict()
-        k_bs = get_bs(k, self.forest)
+        k_bs = self.forest.get(k, frozenset())
 
         # the inside weight of the parent node
         ip = self.inside[k]

@@ -2,14 +2,16 @@ __author__ = 'Iason'
 
 import argparse
 import sys
+import logging
 
 from wcfg import WCFG, read_grammar_rules
 from wfsa import make_linear_fsa
 from sliced_earley import SlicedEarley
-from topSort import TopSort
+from topsort import top_sort
 from sliced_inside import SlicedInside
 from generalisedSampling import GeneralisedSampling
 from symbol import parse_annotated_nonterminal
+import time
 
 """
 Sample N derivations in maximum K iterations with Slice Sampling
@@ -74,8 +76,7 @@ def sliced_sample(wcfg, wfsa, conditions, root='[S]', goal='[GOAL]', a=0.1, b=1)
 
     else:
         # sort the forest
-        top_sort = TopSort(forest)
-        sorted_forest = top_sort.top_sort()
+        sorted_forest = top_sort(forest)
 
         # calculate the inside weight of the sorted forest
         inside = SlicedInside(forest, sorted_forest, slice_variables, goal, a, b)
@@ -89,6 +90,12 @@ def sliced_sample(wcfg, wfsa, conditions, root='[S]', goal='[GOAL]', a=0.1, b=1)
 
 
 def main(args):
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
+    else:
+        logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(message)s')
+
     wcfg = WCFG(read_grammar_rules(args.grammar))
 
     # print 'GRAMMAR\n', wfg
@@ -97,10 +104,9 @@ def main(args):
         wfsa = make_linear_fsa(input_str)
         # print 'FSA\n', wfsa
 
-        import time
         start = time.time()
 
-        sliced_sampling(wcfg, wfsa, '[S]', '[GOAL]', args.n, args.k, args.a, args.b)
+        sliced_sampling(wcfg, wfsa, '[S]', '[GOAL]', args.samples, args.k, args.a, args.b)
         # sliced_sampling(wcfg, wfsa, '[S]', '[GOAL]', 1000, 20000, 0.1, 1)
 
         end = time.time()
@@ -110,9 +116,9 @@ def main(args):
 
 def argparser():
     """parse command line arguments"""
-    parser = argparse.ArgumentParser(prog='parse')
+    parser = argparse.ArgumentParser(prog='mcmcparse')
 
-    parser.description = 'Earley parser'
+    parser.description = 'MCMC Earley parser'
     parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
 
     parser.add_argument('grammar',
@@ -121,15 +127,12 @@ def argparser():
     parser.add_argument('input', nargs='?',
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
-    #parser.add_argument('output', nargs='?',
-    #        type=argparse.FileType('w'), default=sys.stdout,
-    #        help='parse trees')
     parser.add_argument('--verbose', '-v',
             action='store_true',
             help='increase the verbosity level')
-    parser.add_argument('n',
-                        type=int,
-                        help='The amount of samples')
+    parser.add_argument('--samples',
+                        type=int, default=100,
+                        help='The number of samples')
     parser.add_argument('k',
                         type=int,
                         help='The maximum amount of iterations to find "n" samples')

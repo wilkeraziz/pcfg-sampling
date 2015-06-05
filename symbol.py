@@ -23,7 +23,9 @@ def make_terminal(symbol):
     return symbol
 
 def make_symbol(base_symbol, sfrom, sto):
-    return base_symbol if is_terminal(base_symbol) else '[%s,%d-%d]' % (base_symbol[1:-1], sfrom, sto)
+    if sfrom is None and sto is None:
+        return base_symbol
+    return base_symbol if is_terminal(base_symbol) else '[%s,%s-%s]' % (base_symbol[1:-1], sfrom, sto)
 
 def parse_annotated_nonterminal(nt):
     m = NT_RE.match(nt)
@@ -34,7 +36,7 @@ def parse_annotated_nonterminal(nt):
     
 def _make_symbol(base_symbol, sfrom, sto, structured=True):
     if not structured:
-        return base_symbol if is_terminal(base_symbol) else '[%s,%d-%d]' % (base_symbol[1:-1], sfrom, sto)
+        return base_symbol if is_terminal(base_symbol) else '[%s,%s-%s]' % (base_symbol[1:-1], sfrom, sto)
     else:
         return base_symbol if is_terminal(base_symbol) else (base_symbol[1:-1], sfrom, sto)
 

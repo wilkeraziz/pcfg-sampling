@@ -1,111 +1,125 @@
 """
-@author wilkeraziz
+:Authors: - Wilker Aziz
 """
 
-import collections
 import itertools
-import logging
+from collections import deque, defaultdict
 
 EMPTY_SET = frozenset()
-    
 
 
-class Agenda(object):
+class ActiveQueue(object):
+    """
+    Implement a queue of active items.
+    However the queue guarantee that an item never queues more than once.
+    """
 
-    def __init__(self, item_factory, active=[], passive=[]):
-        self._item_factory = item_factory
-        # a queue of active states
-        self._active = collections.OrderedDict()
-        # these are the passive states
-        # they are organized in sets
-        # and distinguished between 'complete' and 'waiting for completion'
-        self._waiting_completion = collections.defaultdict(set)
-        self._complete = collections.defaultdict(set)
-        self._generating = collections.defaultdict(lambda : collections.defaultdict(set))  # generating symbols: LHS -> start -> ends
-
-        for item in active:
-            self._active[item.uid] = True
-
-        for item in passive:
-            if item.is_complete():
-                self._complete[(item.start, item.rule.lhs)].add(item.uid)
-            else:
-                self._waiting_completion[(item.dot, item.next)].add(item.uid)
-
-    def itergenerating(self, lhs):
-        return self._generating.get(lhs, {}).iteritems()
-
-
-    def __str__(self):
-        lines = ['passive (incomplete)']
-        for key, items in self._waiting_completion.iteritems():
-            lines.extend(str(item) for item in items)
-        lines.append('passive (complete)')
-        for key, items in self._complete.iteritems():
-            lines.extend(str(item) for item in items)
-        lines.append('active')
-        for item in self._active.iterkeys():
-            lines.append(str(item))
-        return '\n'.join(lines)
-
-    def clear(self):
-        self._active.clear()
-        self._waiting_completion.clear()
-        self._complete.clear()
+    def __init__(self):
+        self._active = deque()  # items to be processed
+        self._queuing = set()  # items that are queuing (or have already left the queue)
 
     def __len__(self):
+        """Number of active items queuing to be processed"""
         return len(self._active)
 
     def pop(self):
-        uid, _ = self._active.popitem(last=False)
-        return self._item_factory[uid]
+        """Returns the next active item"""
+        return self._active.popleft()
 
-    def is_passive(self, item):
-        """Whether or not this state is passive (that is, is complete or waiting for completion)."""
-        return item.uid in self._waiting_completion.get((item.dot, item.next), EMPTY_SET) or item.uid in self._complete.get((item.start, item.rule.lhs), EMPTY_SET)
+    def add(self, item):
+        """Add an active item if possible"""
+        if item is not self._queuing:
+            self._active.appendleft(item)
+            self._queuing.add(item)
+            return True
+        return False
 
-    def make_passive(self, item):
-        """Make a state passive storing it in the appropriate container."""
-        try:
-            del self._active[item.uid]
-        except:
-            pass
-        if item.is_complete():
-            self.complete(item)
-        else:
-            self._waiting_completion[(item.dot, item.next)].add(item.uid)
 
-    def complete(self, item):
-        """Stores a complete state, this is syntactic sugar for makePassive in case the input state is complete."""
-        assert item.is_complete(), 'This state is not complete: %s' % item
-        self._complete[(item.start, item.rule.lhs)].add(item.uid)
-        self._generating[item.rule.lhs][item.start].add(item.dot)
+class Agenda(object):
+    """
+    This is a CKY agenda which implements the algorithm by Nederhof and Satta (2008).
+    It consists of:
+        1) a queue of active items
+        2) a set of generating intersected nonterminals
+        3) a set of passive items
+        4) a set of complete items
+    """
 
-    def itercomplete(self):
-        """Iterates over the complete states in no particular order."""
-        return (self._item_factory[uid] for uid in itertools.chain(*self._complete.itervalues()))
+    def __init__(self, active_container_type=ActiveQueue):
+        self._active_container_type = active_container_type
+        self._active = active_container_type()  # items to be processed
+        self._passive = defaultdict(set)  # passive items waiting for completion: (LHS, start) -> items
+        self._generating = defaultdict(lambda: defaultdict(set))  # generating symbols: LHS -> start -> ends
+        self._complete = defaultdict(set)  # complete items
 
-    def get_passive(self):
-        passive = collections.defaultdict(set)
-        [passive[key[1]].update(items) for key, items in self._complete.iteritems()]
-        [[passive[self._item_factory[uid].rule.lhs].add(uid) for uid in items] for items in self._waiting_completion.itervalues()]
-        return passive
+    def __len__(self):
+        """Number of active items queuing to be processed"""
+        return len(self._active)
+
+    def pop(self):
+        """Returns the next active item"""
+        return self._active.pop()
+
+    def add(self, item):
+        """Add an active item if possible"""
+        return self._active.add(item)
 
     def extend(self, items):
-        """Adds states to the active queue if necessary and returns how many states were added."""
-        before = len(self._active)
-        # it is important not to add passive items to the active agenda
-        # it would not break the intersection, but it would make it a lot less efficient
-        for item in itertools.ifilter(lambda item: not self.is_passive(item), items):
-            self._active[item.uid] = True
-        return len(self._active) - before
+        for item in items:
+            self.add(item)
 
-    def match_items_waiting_completion(self, complete):
-        """Returns all the passive items that are waiting for the complete input item."""
-        assert complete.is_complete(), 'This is not a complete state: %s' % complete
-        return (self._item_factory[uid] for uid in self._waiting_completion.get((complete.start, complete.rule.lhs), EMPTY_SET))
+    def is_passive(self, item):
+        """Whether or not an item is passive"""
+        return item in self._passive.get((item.next, item.dot), set())
 
-    def match_complete_items(self, incomplete):
-        """Returns all the complete items that can make an incomplete item progress."""
-        assert not incomplete.is_complete(), 'This is not an incomplete item: %s' % incomplete
-        return (self._item_factory[uid] for uid in self._complete.get((incomplete.dot, incomplete.next), EMPTY_SET))
+    def add_generating(self, sym, sfrom, sto):
+        """
+        Tries to add a newly discovered generating symbol.
+        Returns False if the symbol already exists, True otherwise.
+        """
+        destinations = self._generating[sym][sfrom]
+        n = len(destinations)
+        destinations.add(sto)
+        return len(destinations) > n
+
+    def make_passive(self, item):
+        """
+        Tries to make passive an active item.
+        Returns False if the item is already passive, True otherwise.
+        """
+        waiting = self._passive[(item.next, item.dot)]
+        n = len(waiting)
+        waiting.add(item)
+        return len(waiting) > n
+
+    def make_complete(self, item):
+        """Stores a complete item"""
+        self._complete[(item.rule.lhs, item.start, item.dot)].add(item)
+        self.add_generating(item.rule.lhs, item.start, item.dot)
+
+    def discard(self, item):
+        waiting = self._passive.get((item.next, item.dot), None)
+        if waiting:
+            try:
+                waiting.remove(item)
+            except KeyError:
+                pass
+
+    def itergenerating(self, sym):
+        """Returns an iterator to pairs of the kind (start, set of ends) for generating items based on a given symbol"""
+        return self._generating.get(sym, {}).iteritems()
+
+    def itercomplete(self, lhs=None, start=None, end=None):
+        """
+        Iterates through complete items whose left hand-side is (start, lhs, end)
+        or through all of them if lhs is None
+        """
+        return itertools.chain(*self._complete.itervalues()) if lhs is None else iter(self._complete.get((lhs, start, end), set()))
+
+    def iterwaiting(self, sym, start):
+        """Returns items waiting for a certain symbol to complete from a certain state"""
+        return iter(self._passive.get((sym, start), frozenset()))
+
+    def itercompletions(self, sym, start):
+        """Return possible completions of the given item"""
+        return iter(self._generating.get(sym, {}).get(start, frozenset()))

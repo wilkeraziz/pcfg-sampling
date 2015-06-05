@@ -80,5 +80,6 @@ class ItemFactory(object):
             self._uid_by_key[key] = uid
         return self._items[uid]
 
+
     def __getitem__(self, uid):
         return self._items[uid]

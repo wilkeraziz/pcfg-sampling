@@ -1,6 +1,5 @@
 __author__ = 'Iason'
 
-from topSort import get_bs
 from symbol import parse_annotated_nonterminal
 import math
 from scipy.stats import beta
@@ -26,7 +25,7 @@ class SlicedInside(object):
 
         # visit nodes bottom up
         for q in sorted_forest:
-            incoming = get_bs(q, forest)
+            incoming = forest.get(q, frozenset())
 
             # leaves have inside weight 1
             if len(incoming) < 1:
