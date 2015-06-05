@@ -4,7 +4,7 @@ Sampling algorithms for PCFGs
 # PCFG parser
 
 
-    echo '1 2 3 4' | python parse.py examples/itg
+    echo 'I was given a million dollars .' | python parse.py examples/wsj00 --grammarfmt discodop --samples 10
 
 
 # ITG parser
