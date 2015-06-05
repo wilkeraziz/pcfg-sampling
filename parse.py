@@ -7,9 +7,9 @@ import sys
 from reader import load_grammar
 from collections import defaultdict
 from symbol import make_nonterminal
-from wfsa import make_linear_fsa
 from earley import Earley
 from topsort import top_sort
+from sentence import make_sentence
 import inference
 from generalisedSampling import GeneralisedSampling
 
@@ -78,13 +78,15 @@ def main(args):
     start_symbol = make_nonterminal(args.start)
     goal_symbol = make_nonterminal(args.goal)
     for input_str in args.input:
-        wfsa = make_linear_fsa(input_str)
+        sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol)
+        wcfg.update(extra_rules)
+
         # print 'FSA\n', wfsa
 
         import time
         start = time.time()
 
-        exact_sample(wcfg, wfsa, start_symbol, goal_symbol, args.samples)
+        exact_sample(wcfg, sentence.fsa, start_symbol, goal_symbol, args.samples)
 
         end = time.time()
         print "DURATION  = ", end - start
@@ -113,6 +115,13 @@ def argparser():
     parser.add_argument('--grammarfmt',
             type=str, default='bar', choices=['bar', 'discodop'],
             help="grammar format ('bar' is the native format)")
+    parser.add_argument('--unkmodel',
+            type=str, default=None,
+            choices=['passthrough', 'stfdbase', 'stfd4', 'stfd6'],
+            help="unknown word model")
+    parser.add_argument('--default-symbol',
+            type=str, default='X',
+            help='default nonterminal (use for pass-through rules)')
     parser.add_argument('--verbose', '-v',
             action='store_true',
             help='increase the verbosity level')

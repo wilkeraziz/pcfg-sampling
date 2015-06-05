@@ -4,7 +4,13 @@ Sampling algorithms for PCFGs
 # PCFG parser
 
 
-    echo 'I was given a million dollars .' | python parse.py examples/wsj00 --grammarfmt discodop --samples 10
+    echo 'I was given a million dollars .' | python parse.py examples/wsj00 --grammarfmt discodop -v --samples 10
+
+
+To deal with unknown words you need to choose a model (check options with `--help`):
+
+
+    echo 'I was given a million euros .' | python parse.py examples/wsj00 --grammarfmt discodop --unkmodel stfd6 -v --samples 10
 
 
 # ITG parser

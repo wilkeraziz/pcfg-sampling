@@ -28,6 +28,10 @@ class WCFG(object):
             else:
                 self._nonterminals.add(s)
 
+    def update(self, rules):
+        for rule in rules:
+            self.add(rule)
+
     @property
     def nonterminals(self):
         return self._nonterminals

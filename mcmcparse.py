@@ -5,7 +5,7 @@ import sys
 import logging
 
 from wcfg import WCFG, read_grammar_rules
-from wfsa import make_linear_fsa
+from sentence import make_sentence
 from sliced_earley import SlicedEarley
 from topsort import top_sort
 from sliced_inside import SlicedInside
@@ -101,12 +101,12 @@ def main(args):
     # print 'GRAMMAR\n', wfg
 
     for input_str in args.input:
-        wfsa = make_linear_fsa(input_str)
-        # print 'FSA\n', wfsa
+        sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol)
+        wcfg.update(extra_rules)
 
         start = time.time()
 
-        sliced_sampling(wcfg, wfsa, '[S]', '[GOAL]', args.samples, args.k, args.a, args.b)
+        sliced_sampling(wcfg, sentence.fsa, '[S]', '[GOAL]', args.samples, args.max, args.a, args.b)
         # sliced_sampling(wcfg, wfsa, '[S]', '[GOAL]', 1000, 20000, 0.1, 1)
 
         end = time.time()
@@ -127,21 +127,28 @@ def argparser():
     parser.add_argument('input', nargs='?',
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
-    parser.add_argument('--verbose', '-v',
-            action='store_true',
-            help='increase the verbosity level')
     parser.add_argument('--samples',
                         type=int, default=100,
                         help='The number of samples')
-    parser.add_argument('k',
-                        type=int,
-                        help='The maximum amount of iterations to find "n" samples')
-    parser.add_argument('a',
-                        type=float,
+    parser.add_argument('--max',
+                        type=int, default=200,
+                        help='The maximum number of iterations')
+    parser.add_argument('-a',
+                        type=float, default=0.1,
                         help='a, first Beta parameter')
-    parser.add_argument('b',
-                        type=float,
+    parser.add_argument('-b',
+                        type=float, default=1.0,
                         help='b, second Beta parameter')
+    parser.add_argument('--unkmodel',
+            type=str, default=None,
+            choices=['passthrough', 'stfdbase', 'stfd4', 'stfd6'],
+            help="unknown word model")
+    parser.add_argument('--default-symbol',
+            type=str, default='X',
+            help='default nonterminal (use for pass-through rules)')
+    parser.add_argument('--verbose', '-v',
+            action='store_true',
+            help='increase the verbosity level')
 
     return parser
 
