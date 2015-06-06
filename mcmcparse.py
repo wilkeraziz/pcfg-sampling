@@ -4,11 +4,12 @@ import argparse
 import sys
 import logging
 
-from wcfg import WCFG, read_grammar_rules
+from reader import load_grammar
+from collections import defaultdict
 from sentence import make_sentence
 from sliced_earley import SlicedEarley
-from topsort import top_sort
-from sliced_inside import SlicedInside
+from topSort import top_sort
+import sliced_inside
 from generalisedSampling import GeneralisedSampling
 from symbol import parse_annotated_nonterminal
 import time
@@ -17,7 +18,7 @@ import time
 Sample N derivations in maximum K iterations with Slice Sampling
 """
 def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=0.1, b=1):
-    samples = dict()
+    samples = defaultdict(int)
     conditions = dict()
 
     # the previous derivation, initially False
@@ -26,7 +27,7 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=0.1,
     it = 0
     while sum(samples.values()) < n and it < k:
         it += 1
-        if it % (n / 10) == 0:
+        if it % 10 == 0:
                 print it, "/", n
 
         d = sliced_sample(wcfg, wfsa, conditions, root, goal, a, b)
@@ -37,10 +38,7 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=0.1,
             if not d == prev_d:
                 conditions = update_conditions(d)
 
-            if str(d) in samples:
-                samples[str(d)] += 1
-            else:
-                samples[str(d)] = 1
+            samples[str(d)] += 1
 
         prev_d = d
 
@@ -67,6 +65,7 @@ form of MCMC-sampling
 def sliced_sample(wcfg, wfsa, conditions, root='[S]', goal='[GOAL]', a=0.1, b=1):
     slice_variables = dict()
 
+    logging.info('Parsing...')
     parser = SlicedEarley(wcfg, wfsa, slice_variables, conditions, a, b)
     forest = parser.do(root, goal)
 
@@ -75,13 +74,17 @@ def sliced_sample(wcfg, wfsa, conditions, root='[S]', goal='[GOAL]', a=0.1, b=1)
         return False
 
     else:
+        logging.info('Forest: rules=%d', len(forest))
+        logging.debug('Topsorting...')
+
         # sort the forest
-        sorted_forest = top_sort(forest)
+        sorted_nodes = top_sort(forest)
 
         # calculate the inside weight of the sorted forest
-        inside = SlicedInside(forest, sorted_forest, slice_variables, goal, a, b)
-        inside_prob = inside.inside()
+        logging.debug('Inside...')
+        inside_prob = sliced_inside.sliced_inside(forest, sorted_nodes, slice_variables, goal, a, b)
 
+        logging.debug('Sampling...')
         # retrieve a random derivation, with respect to the inside weight distribution
         gen_sampling = GeneralisedSampling(forest, inside_prob)
         d = gen_sampling.sample(goal)
@@ -96,7 +99,11 @@ def main(args):
     else:
         logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(message)s')
 
-    wcfg = WCFG(read_grammar_rules(args.grammar))
+    # wcfg = WCFG(read_grammar_rules(args.grammar))
+
+    logging.info('Loading grammar...')
+    wcfg = load_grammar(args.grammar, args.grammarfmt)
+    logging.info(' %d rules', len(wcfg))
 
     # print 'GRAMMAR\n', wfg
 
@@ -122,8 +129,8 @@ def argparser():
     parser.formatter_class = argparse.ArgumentDefaultsHelpFormatter
 
     parser.add_argument('grammar',
-            type=argparse.FileType('r'),
-            help='CFG rules')
+            type=str,
+            help='path to CFG rules (or prefix in case of discodop format)')
     parser.add_argument('input', nargs='?',
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
@@ -149,6 +156,9 @@ def argparser():
     parser.add_argument('--verbose', '-v',
             action='store_true',
             help='increase the verbosity level')
+    parser.add_argument('--grammarfmt',
+            type=str, default='bar', choices=['bar', 'discodop'],
+            help="grammar format ('bar' is the native format)")
 
     return parser
 

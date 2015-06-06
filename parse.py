@@ -8,7 +8,7 @@ from reader import load_grammar
 from collections import defaultdict
 from symbol import make_nonterminal
 from earley import Earley
-from topsort import top_sort
+from topSort import top_sort
 from sentence import make_sentence
 import inference
 from generalisedSampling import GeneralisedSampling
@@ -53,7 +53,6 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
             d = gen_sampling.sample(goal)
 
             samples[str(d)] += 1
-
 
     print "\nDerivation with their occurrences : "
     for der, occ in samples.iteritems():
