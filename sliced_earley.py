@@ -72,17 +72,14 @@ class SlicedEarley(object):
         If we get to a nondeterminism, we stop scanning and add the relevant items to the agenda.
         """
         states = [item.dot]
-        weight = 0
-        failed = False
         for sym in item.nextsymbols():
             if is_terminal(sym):
                 arcs = self._wfsa.get_arcs(origin=states[-1], symbol=sym)
                 if len(arcs) == 0:  # cannot scan the symbol
                     return False
                 elif len(arcs) == 1:  # symbol is scanned deterministically
-                    sto, w = arcs[0]
+                    sto, _ = arcs[0]
                     states.append(sto)  # we do not create intermediate items, instead we scan as much as we can
-                    weight += w
                 else:  # here we found a nondeterminism, we create all relevant items and add them to the agenda
                     # create items
                     for sto, w in arcs:
@@ -100,9 +97,12 @@ class SlicedEarley(object):
         This operation creates new item by advancing the dot of passive items that are waiting for a certain given complete item.
         It returns whether or not at least one passive item awaited for the given complete item.
         """
+        if self._agenda.is_generating(item.rule.lhs, item.start, item.dot):
+            return True
         new_items = [self.advance(incomplete, item.dot) for incomplete in self._agenda.iterwaiting(item.rule.lhs, item.start)]
         self._agenda.extend(new_items)
         return len(new_items) > 0  # was there any item waiting for the complete one?
+
 
     def complete_itself(self, item):
         """
@@ -125,11 +125,7 @@ class SlicedEarley(object):
         new_roots = set()
 
         while agenda:
-            item = agenda.pop()
-
-            # sometimes there are no active items left in the agenda
-            if agenda.is_passive(item):
-                continue
+            item = agenda.pop()  # always returns an active item
 
             if item.is_complete():
 
