@@ -8,7 +8,7 @@ from reader import load_grammar
 from collections import defaultdict
 from symbol import make_nonterminal
 from earley import Earley
-from topSort import top_sort
+from topsort import top_sort
 from sentence import make_sentence
 import inference
 from generalisedSampling import GeneralisedSampling

@@ -8,7 +8,7 @@ from reader import load_grammar
 from collections import defaultdict
 from sentence import make_sentence
 from sliced_earley import SlicedEarley
-from topSort import top_sort
+from topsort import top_sort
 import sliced_inside
 from generalisedSampling import GeneralisedSampling
 from symbol import parse_annotated_nonterminal
@@ -70,7 +70,7 @@ def sliced_sample(wcfg, wfsa, conditions, root='[S]', goal='[GOAL]', a=0.1, b=1)
     forest = parser.do(root, goal)
 
     if not forest:
-        # print 'NO PARSE FOUND'
+        logging.debug('NO PARSE FOUND')
         return False
 
     else:

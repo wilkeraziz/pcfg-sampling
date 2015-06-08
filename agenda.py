@@ -16,7 +16,7 @@ class ActiveQueue(object):
 
     def __init__(self):
         self._active = deque()  # items to be processed
-        self._queuing = set()  # items that are queuing (or have already left the queue)
+        self._seen = set()  # items that are queuing (or have already left the queue)
 
     def __len__(self):
         """Number of active items queuing to be processed"""
@@ -28,9 +28,9 @@ class ActiveQueue(object):
 
     def add(self, item):
         """Add an active item if possible"""
-        if item is not self._queuing:
+        if item not in self._seen:
             self._active.appendleft(item)
-            self._queuing.add(item)
+            self._seen.add(item)
             return True
         return False
 
@@ -81,6 +81,9 @@ class Agenda(object):
         n = len(destinations)
         destinations.add(sto)
         return len(destinations) > n
+
+    def is_generating(self, sym, sfrom, sto):
+        return sto in self._generating.get(sym, {}).get(sfrom, set())
 
     def make_passive(self, item):
         """
