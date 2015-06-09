@@ -67,7 +67,7 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='neder
         for d, n in counts.most_common():
             score = sum(r.log_prob for r in d)
             prob = math.exp(score - inside_prob[goal])
-            print '# n=%s freq=%s prob=%s score=%s' % (n, float(n)/len(samples), prob, score)
+            print '# n=%s estimate=%s prob=%s score=%s' % (n, float(n)/len(samples), prob, score)
             for r in d:
                 print r
             print 
