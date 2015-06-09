@@ -3,11 +3,12 @@ __author__ = 'Iason'
 import argparse
 import logging
 import sys
-
+import math
 from reader import load_grammar
-from collections import defaultdict
+from collections import defaultdict, Counter
 from symbol import make_nonterminal
 from earley import Earley
+from nederhof import Nederhof
 from topsort import top_sort
 from sentence import make_sentence
 import inference
@@ -18,11 +19,19 @@ from generalisedSampling import GeneralisedSampling
 Sample a derivation given a wcfg and a wfsa, with exact sampling, a
 form of MC-sampling
 """
-def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
-    samples = defaultdict(int)
+def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='nederhof'):
+    samples = []
 
-    logging.info('Parsing...')
-    parser = Earley(wcfg, wfsa)
+    if intersection == 'nederhof':
+        parser = Nederhof(wcfg, wfsa)
+        logging.info('Using Nederhof parser')
+    elif intersection == 'earley':
+        parser = Earley(wcfg, wfsa)
+        logging.info('Using Earley parser')
+    else:
+        raise NotImplementedError('I do not know this algorithm: %s' % intersection)
+
+    logging.debug('Parsing...')
     forest = parser.do(root, goal)
 
     if not forest:
@@ -30,7 +39,7 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
         return False
     else:
 
-        logging.info('Forest: rules=%d', len(forest))
+        logging.debug('Forest: rules=%d', len(forest))
 
         logging.debug('Topsorting...')
         # sort the forest
@@ -44,21 +53,24 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1):
 
         logging.debug('Sampling...')
         it = 0
-        while sum(samples.values()) < n:
+        while len(samples) < n:
             it += 1
             if it % 10 == 0:
-                print it, "/", n
+                logging.info('%d/%d', it, n)
 
             # retrieve a random derivation, with respect to the inside weight distribution
             d = gen_sampling.sample(goal)
 
-            samples[str(d)] += 1
+            samples.append(d)
 
-    print "\nDerivation with their occurrences : "
-    for der, occ in samples.iteritems():
-        print der, occ
-
-
+        counts = Counter(tuple(d) for d in samples)
+        for d, n in counts.most_common():
+            score = sum(r.log_prob for r in d)
+            prob = math.exp(score - inside_prob[goal])
+            print '# n=%s freq=%s prob=%s score=%s' % (n, float(n)/len(samples), prob, score)
+            for r in d:
+                print r
+            print 
 
 
 def main(args):
@@ -69,7 +81,10 @@ def main(args):
         logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(message)s')
 
     logging.info('Loading grammar...')
-    wcfg = load_grammar(args.grammar, args.grammarfmt)
+    if args.log:
+        wcfg = load_grammar(args.grammar, args.grammarfmt, transform=math.log)
+    else:
+        wcfg = load_grammar(args.grammar, args.grammarfmt, transform=float)
     logging.info(' %d rules', len(wcfg))
     #print 'GRAMMAR \n', wcfg
 
@@ -85,7 +100,7 @@ def main(args):
         import time
         start = time.time()
 
-        exact_sample(wcfg, sentence.fsa, start_symbol, goal_symbol, args.samples)
+        exact_sample(wcfg, sentence.fsa, start_symbol, goal_symbol, args.samples, args.intersection)
 
         end = time.time()
         print "DURATION  = ", end - start
@@ -105,6 +120,12 @@ def argparser():
     parser.add_argument('input', nargs='?',
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
+    parser.add_argument('--intersection',
+            type=str, default='nederhof', choices=['nederhof', 'earley'],
+            help="intersection algorithm (nederhof: bottom-up; earley: top-down)")
+    parser.add_argument('--log',
+            action='store_true',
+            help='applies the log transform to the probabilities of the rules')
     parser.add_argument('--start',
             type=str, default='S', 
             help="start symbol of the grammar")

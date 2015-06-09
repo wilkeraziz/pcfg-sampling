@@ -32,7 +32,7 @@ def parse_annotated_nonterminal(nt):
     if m is None:
         return nt, None, None
     else:
-        return '[{0}]'.format(m.group(1)), m.group(2), m.group(3)
+        return '[{0}]'.format(m.group(1)), int(m.group(2)), int(m.group(3))
     
 def _make_symbol(base_symbol, sfrom, sto, structured=True):
     if not structured:

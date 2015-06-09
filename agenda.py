@@ -4,6 +4,10 @@
 
 import itertools
 from collections import deque, defaultdict
+from symbol import make_symbol, is_nonterminal
+from rule import Rule
+from wcfg import WCFG
+
 
 EMPTY_SET = frozenset()
 
@@ -126,3 +130,46 @@ class Agenda(object):
     def itercompletions(self, sym, start):
         """Return possible completions of the given item"""
         return iter(self._generating.get(sym, {}).get(start, frozenset()))
+
+
+def get_intersected_rule(item):
+    lhs = make_symbol(item.rule.lhs, item.start, item.dot)
+    positions = item.inner + (item.dot,)
+    rhs = [make_symbol(sym, positions[i], positions[i + 1]) for i, sym in enumerate(item.rule.rhs)]
+    return Rule(lhs, rhs, item.rule.log_prob)
+
+
+def get_cfg(goal, root, fsa, agenda):
+    """
+    Constructs the CFG by visiting complete items in a top-down fashion.
+    This is effectively a reachability test and it serves the purpose of filtering nonterminal symbols
+    that could never be reached from the root.
+    Note that bottom-up intersection typically does enumerate a lot of useless (unreachable) items.
+    This is the recursive procedure described in the paper (Nederhof and Satta, 2008).
+    """
+
+    G = WCFG()
+    processed = set()
+
+    def make_rules(lhs, start, end):
+        if (start, lhs, end) in processed:
+            return
+        processed.add((lhs, start, end))
+        for item in agenda.itercomplete(lhs, start, end):
+            G.add(get_intersected_rule(item))
+            fsa_states = item.inner + (item.dot,)
+            for i, sym in itertools.ifilter(lambda (_, s): is_nonterminal(s), enumerate(item.rule.rhs)):
+                if (sym, fsa_states[i], fsa_states[
+                        i + 1]) not in processed:  # Nederhof does not perform this test, but in python it turned out crucial
+                    make_rules(sym, fsa_states[i], fsa_states[i + 1])
+
+    # create goal items
+    for start, ends in agenda.itergenerating(root):
+        if not fsa.is_initial(start):
+            continue
+        for end in itertools.ifilter(lambda q: fsa.is_final(q), ends):
+            make_rules(root, start, end)
+            G.add(Rule(make_symbol(goal, None, None),
+                       [make_symbol(root, start, end)], 0.0))
+
+    return G

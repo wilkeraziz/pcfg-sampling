@@ -3,78 +3,93 @@ __author__ = 'Iason'
 import argparse
 import sys
 import logging
-
+import math
 from reader import load_grammar
-from collections import defaultdict
+from collections import defaultdict, Counter
 from sentence import make_sentence
+from slice_variable import SliceVariable
 from sliced_earley import SlicedEarley
+from sliced_nederhof import SlicedNederhof
 from topsort import top_sort
 import sliced_inside
 from generalisedSampling import GeneralisedSampling
-from symbol import parse_annotated_nonterminal
+from symbol import parse_annotated_nonterminal, make_nonterminal
 import time
 
-"""
-Sample N derivations in maximum K iterations with Slice Sampling
-"""
-def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=0.1, b=1):
-    samples = defaultdict(int)
-    conditions = dict()
 
-    # the previous derivation, initially False
-    prev_d = False
+def get_conditions(d):
+    """
+    update conditions: the probability of each state of the previous derivation is assigned
+    to the condition of that state
+    """
+    return {parse_annotated_nonterminal(rule.lhs): rule.log_prob for rule in d}
 
+
+def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=[0.1, 0.1], b=[1.0, 1.0], intersection='nederhof'):
+    """
+    Sample N derivations in maximum K iterations with Slice Sampling
+    """
+    
+    if intersection == 'nederhof':
+        logging.info('Using Nederhof parser')
+        parser_type = SlicedNederhof
+    elif intersection == 'earley':
+        parser_type = SlicedEarley
+        logging.info('Using Earley parser')
+    else:
+        raise NotImplementedError('I do not know this algorithm: %s' % intersection)
+    
+    samples = []
+    slice_vars = SliceVariable(a=a[0], b=b[0])
     it = 0
-    while sum(samples.values()) < n and it < k:
+    while len(samples) < n and it < k:
         it += 1
         if it % 10 == 0:
-                print it, "/", n
+            logging.info('%d/%d', it, n)
+        
+        d = sliced_sample(wcfg, wfsa, root, goal, parser_type(wcfg, wfsa, slice_vars))
 
-        d = sliced_sample(wcfg, wfsa, conditions, root, goal, a, b)
+        if d is not None:
+            samples.append(d)
+            # because we have a derivation
+            # we reset the assignments of the slice variables
+            # we fix new conditions
+            # and we move on to the second pair of parameters of the beta
+            conditions = get_conditions(d)
+            slice_vars.reset(conditions, a[1], b[1])
+        else:
+            # because we do not have a derivation
+            # but we are indeed finishing one iteration
+            # we reset the assignments of the slice variables
+            # however we leave the conditions unchanged
+            # similarly, we do not change the parameters of the beta
+            slice_vars.reset()
 
-        if d is not False:
-            # often the previous derivation is similar to the new sampled derivation
-            # updating the conditions would be a waste of time, since they remain the same
-            if not d == prev_d:
-                conditions = update_conditions(d)
+    counts = Counter(tuple(d) for d in samples)
+    for d, n in counts.most_common():
+        score = sum(r.log_prob for r in d)
+        print '# n=%s freq=%s score=%s' % (n, float(n)/len(samples), score)
+        for r in d:
+            print r
+        print 
 
-            samples[str(d)] += 1
+    #print "\nCount failed derivations: ", it - sum(samples.values())
 
-        prev_d = d
+def sliced_sample(wcfg, wfsa, root, goal, parser):
+    """
+    Sample a derivation given a wcfg and a wfsa, with Slice Sampling, a
+    form of MCMC-sampling
+    """
 
-    print "\nDerivation with their occurrences : "
-    for der, occ in samples.iteritems():
-        print der, occ
-
-    print "\nCount failed derivations: ", it - sum(samples.values())
-
-"""
-update conditions: the probability of each state of the previous derivation is assigned
-to the condition of that state
-"""
-def update_conditions(d):
-    conditions = dict()
-    for rule in d:
-        conditions[parse_annotated_nonterminal(rule.lhs)] = rule.log_prob
-    return conditions
-
-"""
-Sample a derivation given a wcfg and a wfsa, with Slice Sampling, a
-form of MCMC-sampling
-"""
-def sliced_sample(wcfg, wfsa, conditions, root='[S]', goal='[GOAL]', a=0.1, b=1):
-    slice_variables = dict()
-
-    logging.info('Parsing...')
-    parser = SlicedEarley(wcfg, wfsa, slice_variables, conditions, a, b)
+    logging.debug('Parsing...')
     forest = parser.do(root, goal)
 
     if not forest:
         logging.debug('NO PARSE FOUND')
-        return False
+        return None
 
     else:
-        logging.info('Forest: rules=%d', len(forest))
+        logging.debug('Forest: rules=%d', len(forest))
         logging.debug('Topsorting...')
 
         # sort the forest
@@ -82,7 +97,7 @@ def sliced_sample(wcfg, wfsa, conditions, root='[S]', goal='[GOAL]', a=0.1, b=1)
 
         # calculate the inside weight of the sorted forest
         logging.debug('Inside...')
-        inside_prob = sliced_inside.sliced_inside(forest, sorted_nodes, slice_variables, goal, a, b)
+        inside_prob = sliced_inside.sliced_inside(forest, sorted_nodes, goal, parser.slice_vars)
 
         logging.debug('Sampling...')
         # retrieve a random derivation, with respect to the inside weight distribution
@@ -102,7 +117,11 @@ def main(args):
     # wcfg = WCFG(read_grammar_rules(args.grammar))
 
     logging.info('Loading grammar...')
-    wcfg = load_grammar(args.grammar, args.grammarfmt)
+    if args.log:
+        wcfg = load_grammar(args.grammar, args.grammarfmt, transform=math.log)
+    else:
+        wcfg = load_grammar(args.grammar, args.grammarfmt, transform=float)
+
     logging.info(' %d rules', len(wcfg))
 
     # print 'GRAMMAR\n', wfg
@@ -113,8 +132,7 @@ def main(args):
 
         start = time.time()
 
-        sliced_sampling(wcfg, sentence.fsa, '[S]', '[GOAL]', args.samples, args.max, args.a, args.b)
-        # sliced_sampling(wcfg, wfsa, '[S]', '[GOAL]', 1000, 20000, 0.1, 1)
+        sliced_sampling(wcfg, sentence.fsa, make_nonterminal(args.start), make_nonterminal(args.goal), args.samples, args.max, args.a, args.b, args.intersection)
 
         end = time.time()
         print "DURATION  = ", end - start
@@ -134,6 +152,18 @@ def argparser():
     parser.add_argument('input', nargs='?',
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
+    parser.add_argument('--intersection',
+            type=str, default='nederhof', choices=['nederhof', 'earley'],
+            help="intersection algorithm (nederhof: bottom-up; earley: top-down)")
+    parser.add_argument('--log',
+            action='store_true',
+            help='applies the log transform to the probabilities of the rules')
+    parser.add_argument('--start',
+            type=str, default='S', 
+            help="start symbol of the grammar")
+    parser.add_argument('--goal',
+            type=str, default='GOAL', 
+            help="goal symbol for intersection")
     parser.add_argument('--samples',
                         type=int, default=100,
                         help='The number of samples')
@@ -141,11 +171,11 @@ def argparser():
                         type=int, default=200,
                         help='The maximum number of iterations')
     parser.add_argument('-a',
-                        type=float, default=0.1,
-                        help='a, first Beta parameter')
+                        type=float, nargs=2, default=[0.1, 0.3], metavar='BEFORE AFTER',
+                        help='a, first Beta parameter before and after finding the first derivation')
     parser.add_argument('-b',
-                        type=float, default=1.0,
-                        help='b, second Beta parameter')
+                        type=float, nargs=2, default=[1.0, 1.0], metavar='BEFORE AFTER',
+                        help='b, second Beta parameter before and after finding the first derivation')
     parser.add_argument('--unkmodel',
             type=str, default=None,
             choices=['passthrough', 'stfdbase', 'stfd4', 'stfd6'],

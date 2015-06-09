@@ -57,7 +57,7 @@ class GeneralisedSampling(object):
 
                 # consider all of its tail nodes
                 for r in b.rhs:
-                    temp_iq = temp_iq + self.inside[r]
+                    temp_iq += self.inside[r]
 
                 self.iq[b] = temp_iq
 

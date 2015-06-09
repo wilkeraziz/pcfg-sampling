@@ -4,9 +4,14 @@
 
 This work is based on the work of wilkeraziz: earley.py
 And extended with Slice Sampling by Iason
+
+:Authors: 
+    - Wilker Aziz
+    - Iason
 """
 
 EMPTY_SET = frozenset()
+import logging
 from agenda import Agenda, ActiveQueue
 from item import ItemFactory
 from symbol import is_terminal, make_symbol, is_nonterminal
@@ -20,7 +25,7 @@ class SlicedEarley(object):
     """
     """
 
-    def __init__(self, wcfg, wfsa, slice_variables, conditions, a=0.1, b=1):
+    def __init__(self, wcfg, wfsa, slice_vars):
         """
         """
 
@@ -29,11 +34,7 @@ class SlicedEarley(object):
         self._agenda = Agenda(active_container_type=ActiveQueue)
         self._predictions = set()  # (LHS, start)
         self._item_factory = ItemFactory()
-
-        self.slice_variables = slice_variables
-        self.conditions = conditions
-        self.a = a
-        self.b = b
+        self.slice_vars = slice_vars
 
     def get_item(self, rule, dot, inner=[]):
         return self._item_factory.get_item(rule, dot, inner)
@@ -129,9 +130,7 @@ class SlicedEarley(object):
 
             if item.is_complete():
 
-                # create a slice variable for the current completed item
-                slice_variable = SliceVariable(item, self.slice_variables, self.conditions, self.a, self.b)
-                u = slice_variable.get()
+                u = self.slice_vars.get(item.rule.lhs, item.start, item.dot)
 
                 # check whether the probability of the current completed item is above the threshold determined by
                 # the slice variable
@@ -160,6 +159,7 @@ class SlicedEarley(object):
                             self.complete_itself(item)
                         agenda.make_passive(item)
         # converts complete items into rules
+        logging.debug('Making forest...')
         return self.get_cfg(goal, root)
 
     def get_intersected_rule(self, item):

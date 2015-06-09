@@ -98,20 +98,21 @@ def count_derivations(wcfg, root):
     return counts
 
 
-def read_grammar_rules(istream, take_log=False):
+def read_grammar_rules(istream, transform=log):
     """
     Reads grammar rules in cdec format.
 
 
+    >>> import math
     >>> istream = ['[S] ||| [X] ||| 1.0', '[X] ||| [X] [X] ||| 0.5'] + ['[X] ||| %d ||| 0.1' % i for i in range(1,6)]
-    >>> rules = list(read_grammar_rules(istream, take_log=True))
+    >>> rules = list(read_grammar_rules(istream, transform=log))
     >>> rules
     [[S] -> [X] (0.0), [X] -> [X] [X] (-0.69314718056), [X] -> 1 (-2.30258509299), [X] -> 2 (-2.30258509299), [X] -> 3 (-2.30258509299), [X] -> 4 (-2.30258509299), [X] -> 5 (-2.30258509299)]
     """
     for line in istream:
         lhs, rhs, log_prob = line.strip().split(' ||| ')
         rhs = rhs.split()
-        log_prob = float(log_prob)
+        log_prob = transform(float(log_prob))
         if take_log:
             log_prob = log(log_prob)
         yield Rule(lhs, rhs, log_prob)

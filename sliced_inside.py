@@ -4,9 +4,10 @@ import math
 from collections import defaultdict
 from scipy.stats import beta
 from symbol import parse_annotated_nonterminal
+import logging
 
 
-def sliced_inside(forest, topsort, slice_variables, goal, a, b):
+def sliced_inside(forest, topsort, goal, slice_variables):
     """
     Sliced Inside recursion.
     :return: a dictionary mapping a symbol to its inside weight.
@@ -27,11 +28,13 @@ def sliced_inside(forest, topsort, slice_variables, goal, a, b):
             total = -float("inf")
 
             for rule in rules:
-                # k = rule.log_prob
-                if not parent == goal:
-                    u = slice_variables[parse_annotated_nonterminal(rule.lhs)]
-                    k = math.log(1 / beta.pdf(math.exp(u), a, b))
+              
+                # weight of the rule
+                if not parent == goal:  # rules rooted by the goal symbol have probability 1 (or 0 in log-domain) and there is no slice variable for the goal symbol
+                    sym, start, end = parse_annotated_nonterminal(rule.lhs)
+                    k = slice_variables.weight(sym, start, end, rule.log_prob)
 
+                # inside of children
                 for child in rule.rhs:
                     # including the rule own weight
                     # log(a * b) = log(a) + log(b)
