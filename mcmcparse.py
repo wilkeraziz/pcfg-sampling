@@ -68,7 +68,7 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=[0.1
     counts = Counter(tuple(d) for d in samples)
     for d, n in counts.most_common():
         score = sum(r.log_prob for r in d)
-        print '# n=%s freq=%s score=%s' % (n, float(n)/len(samples), score)
+        print '# n=%s estimate=%s score=%s' % (n, float(n)/len(samples), score)
         for r in d:
             print r
         print 
