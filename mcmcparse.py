@@ -73,7 +73,8 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=[0.1
             print r
         print 
 
-    #print "\nCount failed derivations: ", it - sum(samples.values())
+    # print "\nCount failed derivations: ", it - sum(samples.values())
+
 
 def sliced_sample(wcfg, wfsa, root, goal, parser):
     """
@@ -114,8 +115,6 @@ def main(args):
     else:
         logging.basicConfig(level=logging.INFO, format='%(asctime)-15s %(levelname)s %(message)s')
 
-    # wcfg = WCFG(read_grammar_rules(args.grammar))
-
     logging.info('Loading grammar...')
     if args.log:
         wcfg = load_grammar(args.grammar, args.grammarfmt, transform=math.log)
@@ -123,8 +122,6 @@ def main(args):
         wcfg = load_grammar(args.grammar, args.grammarfmt, transform=float)
 
     logging.info(' %d rules', len(wcfg))
-
-    # print 'GRAMMAR\n', wfg
 
     for input_str in args.input:
         sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol)

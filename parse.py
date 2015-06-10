@@ -1,11 +1,12 @@
 __author__ = 'Iason'
 
+import time
 import argparse
 import logging
 import sys
 import math
 from reader import load_grammar
-from collections import defaultdict, Counter
+from collections import Counter
 from symbol import make_nonterminal
 from earley import Earley
 from nederhof import Nederhof
@@ -15,11 +16,11 @@ import inference
 from generalisedSampling import GeneralisedSampling
 
 
-"""
-Sample a derivation given a wcfg and a wfsa, with exact sampling, a
-form of MC-sampling
-"""
 def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='nederhof'):
+    """
+    Sample a derivation given a wcfg and a wfsa, with exact sampling, a
+    form of MC-sampling
+    """
     samples = []
 
     if intersection == 'nederhof':
@@ -86,8 +87,6 @@ def main(args):
     else:
         wcfg = load_grammar(args.grammar, args.grammarfmt, transform=float)
     logging.info(' %d rules', len(wcfg))
-    #print 'GRAMMAR \n', wcfg
-
 
     start_symbol = make_nonterminal(args.start)
     goal_symbol = make_nonterminal(args.goal)
@@ -95,13 +94,8 @@ def main(args):
         sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol)
         wcfg.update(extra_rules)
 
-        # print 'FSA\n', wfsa
-
-        import time
         start = time.time()
-
         exact_sample(wcfg, sentence.fsa, start_symbol, goal_symbol, args.samples, args.intersection)
-
         end = time.time()
         print "DURATION  = ", end - start
 

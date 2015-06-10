@@ -1,7 +1,4 @@
 """
-@author wilkeraziz
-@author Iason
-
 This work is based on the work of wilkeraziz: earley.py
 And extended with Slice Sampling by Iason
 
@@ -129,7 +126,7 @@ class SlicedEarley(object):
             item = agenda.pop()  # always returns an active item
 
             if item.is_complete():
-
+                # get slice variable for the current completed item
                 u = self.slice_vars.get(item.rule.lhs, item.start, item.dot)
 
                 # check whether the probability of the current completed item is above the threshold determined by

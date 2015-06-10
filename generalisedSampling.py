@@ -12,10 +12,10 @@ class GeneralisedSampling(object):
         self.inside = inside_prob
         self.iq = dict()
 
-    """
-    the generalised sample algorithm
-    """
     def sample(self, goal='[GOAL]'):
+        """
+        the generalised sample algorithm
+        """
 
         # an empty partial derivation
         d = []
@@ -39,10 +39,10 @@ class GeneralisedSampling(object):
 
         return d
 
-    """
-    select method, draws a random edge with respect to the Inside weight distribution
-    """
     def select(self, k):
+        """
+        select method, draws a random edge with respect to the Inside weight distribution
+        """
         # self.iq = dict()
         k_bs = self.forest.get(k, frozenset())
 
