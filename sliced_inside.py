@@ -12,7 +12,7 @@ def sliced_inside(forest, topsort, goal, slice_variables):
     Sliced Inside recursion.
     :return: a dictionary mapping a symbol to its inside weight.
     """
-    inside_prob = defaultdict(float)
+    inside_prob = defaultdict(None)
 
     # visit nodes bottom up
     for parent in topsort:
