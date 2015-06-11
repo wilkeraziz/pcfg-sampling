@@ -33,6 +33,8 @@ def sliced_inside(forest, topsort, goal, slice_variables):
                 if not parent == goal:  # rules rooted by the goal symbol have probability 1 (or 0 in log-domain) and there is no slice variable for the goal symbol
                     sym, start, end = parse_annotated_nonterminal(rule.lhs)
                     k = slice_variables.weight(sym, start, end, rule.log_prob)
+                else:
+                    k = 0
 
                 # inside of children
                 for child in rule.rhs:
