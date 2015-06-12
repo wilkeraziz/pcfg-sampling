@@ -1,4 +1,6 @@
-__author__ = 'Iason'
+"""
+:Authors: - Iason
+"""
 
 import time
 import argparse
@@ -12,7 +14,7 @@ from earley import Earley
 from nederhof import Nederhof
 from topsort import top_sort
 from sentence import make_sentence
-import inference
+from inference import inside
 from generalisedSampling import GeneralisedSampling
 
 
@@ -48,7 +50,7 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='neder
 
         # calculate the inside weight of the sorted forest
         logging.debug('Inside...')
-        inside_prob = inference.inside(forest, sorted_nodes)
+        inside_prob = inside(forest, sorted_nodes)
 
         gen_sampling = GeneralisedSampling(forest, inside_prob)
 

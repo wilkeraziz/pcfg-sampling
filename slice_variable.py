@@ -1,4 +1,6 @@
-__author__ = 'Iason'
+"""
+:Authors: - Iason
+"""
 
 import numpy
 import math

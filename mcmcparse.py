@@ -1,4 +1,6 @@
-__author__ = 'Iason'
+"""
+:Authors: - Iason
+"""
 
 import argparse
 import sys
@@ -48,7 +50,7 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn
         if it % 10 == 0:
             logging.info('it=%d samples=%d', it, len(samples))
         
-        d = sliced_sample(wcfg, wfsa, root, goal, parser_type(wcfg, wfsa, slice_vars))
+        d = sliced_sample(root, goal, parser_type(wcfg, wfsa, slice_vars))
 
         if d is not None:
             if n_burn > 0:  # in case we are burning derivations, we do not add them to the list
@@ -96,7 +98,8 @@ def edge_uniform_weight(edge, goal, slicevars):
         sym, start, end = parse_annotated_nonterminal(edge.lhs)
         return slicevars.weight(sym, start, end, edge.log_prob)
 
-def sliced_sample(wcfg, wfsa, root, goal, parser):
+
+def sliced_sample(root, goal, parser):
     """
     Sample a derivation given a wcfg and a wfsa, with Slice Sampling, a
     form of MCMC-sampling
