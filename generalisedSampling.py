@@ -1,4 +1,6 @@
-__author__ = 'Iason'
+"""
+:Authors: - Iason
+"""
 
 from symbol import is_nonterminal
 import math
@@ -7,10 +9,22 @@ import random
 
 class GeneralisedSampling(object):
 
-    def __init__(self, forest, inside_prob):
+    def __init__(self, forest, inside_node, omega=lambda edge: edge.log_prob):
+        """
+
+        :param forest: an acyclic hypergraph
+        :param inside_node: a dictionary mapping nodes to their inside weights.
+        :param omega: a function that returns the weight of an edge.
+            By default we return the edge's log probability, but omega
+            can be used in situations where we must compute a function of that weight, for example,
+            when we want to convert from a semiring to another,
+            or when we want to compute a uniform probability based on assingments of the slice variables.
+        """
+
         self.forest = forest
-        self.inside = inside_prob
-        self.iq = dict()
+        self.inside_node = inside_node
+        self.inside_edge = dict()  # cache for the inside weight of edges
+        self.omega = omega
 
     def sample(self, goal='[GOAL]'):
         """
@@ -21,60 +35,60 @@ class GeneralisedSampling(object):
         d = []
 
         # Q, a queue of nodes to be visited, starting from [GOAL]
-        q = [goal]
+        Q = [goal]
 
-        while q:
-            k = q.pop()
+        while Q:
+            parent = Q.pop()
 
             # select an edge
-            e = self.select(k)
+            edge = self.select(parent)
 
             # add the edge to the partial derivation
-            d.append(e)
+            d.append(edge)
 
             # queue the non-terminal nodes in the tail of the selected edge
-            for n in e.rhs:
-                if is_nonterminal(n):
-                    q.append(n)
+            for child in edge.rhs:
+                if is_nonterminal(child):
+                    Q.append(child)
 
         return d
 
-    def select(self, k):
+    def get_edge_inside(self, edge):
+        """Compute the inside weight of an edge (caching the result)."""
+        w = self.inside_edge.get(edge, None)
+        if w is None:
+            # starting from the edge's own weight
+            # and including the inside of each child node
+            # accumulate (log-domain) all contributions
+            w = sum((self.inside_node[child] for child in edge.rhs), self.omega(edge))
+            self.inside_edge[edge] = w
+        return w
+
+    def select(self, parent):
         """
         select method, draws a random edge with respect to the Inside weight distribution
         """
         # self.iq = dict()
-        k_bs = self.forest.get(k, frozenset())
+        incoming = self.forest.get(parent, frozenset())
+
+        if not incoming:
+            raise ValueError('I cannot sample an incoming edge to a terminal node')
 
         # the inside weight of the parent node
-        ip = self.inside[k]
-
-        # calculate the Inside weight for each edge in BS of parent node
-        for b in k_bs:
-            if b not in self.iq:
-                # edge own weight
-                temp_iq = b.log_prob
-
-                # consider all of its tail nodes
-                for r in b.rhs:
-                    temp_iq += self.inside[r]
-
-                self.iq[b] = temp_iq
+        ip = self.inside_node[parent]
 
         # select an edge randomly with respect to the distribution of the edges
         # threshold for selecting an edge
         threshold = math.log(random.uniform(0, math.exp(ip)))
 
         acc = -float("inf")
-
-        for e in k_bs:
-            acc = math.log(math.exp(acc) + math.exp(self.iq[e]))
-
+        for e in incoming:
+            acc = math.log(math.exp(acc) + math.exp(self.get_edge_inside(e)))
             if acc > threshold:
                 return e
 
         # if there is not yet an edge returned for some rare rounding error,
         # return the last edge, hence that is the edge closest to the threshold
-        return k_bs[-1]
+        return e
 
 

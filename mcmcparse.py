@@ -11,10 +11,11 @@ from slice_variable import SliceVariable
 from sliced_earley import SlicedEarley
 from sliced_nederhof import SlicedNederhof
 from topsort import top_sort
-import sliced_inside
+from inference import inside
 from generalisedSampling import GeneralisedSampling
 from symbol import parse_annotated_nonterminal, make_nonterminal
 import time
+from scipy.stats import beta
 
 
 def get_conditions(d):
@@ -25,7 +26,7 @@ def get_conditions(d):
     return {parse_annotated_nonterminal(rule.lhs): rule.log_prob for rule in d}
 
 
-def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=[0.1, 0.1], b=[1.0, 1.0], intersection='nederhof'):
+def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn=100, max_iterations=1000, a=[0.1, 0.1], b=[1.0, 1.0], intersection='nederhof'):
     """
     Sample N derivations in maximum K iterations with Slice Sampling
     """
@@ -42,15 +43,19 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=[0.1
     samples = []
     slice_vars = SliceVariable(a=a[0], b=b[0])
     it = 0
-    while len(samples) < n and it < k:
+    while len(samples) < n_samples and it < max_iterations:
         it += 1
         if it % 10 == 0:
-            logging.info('%d/%d', it, n)
+            logging.info('it=%d samples=%d', it, len(samples))
         
         d = sliced_sample(wcfg, wfsa, root, goal, parser_type(wcfg, wfsa, slice_vars))
 
         if d is not None:
-            samples.append(d)
+            if n_burn > 0:  # in case we are burning derivations, we do not add them to the list
+                n_burn -= 1  # but we still use them to update the slice variables
+            else:
+                samples.append(d)
+
             # because we have a derivation
             # we reset the assignments of the slice variables
             # we fix new conditions
@@ -76,6 +81,21 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n=100, k=1000, a=[0.1
     # print "\nCount failed derivations: ", it - sum(samples.values())
 
 
+def edge_uniform_weight(edge, goal, slicevars):
+    """
+    Return a uniform view of the edge's log-probability.
+    :param edge: an edge
+    :param goal: the goal node (gets a special treatment because there are no slice variables for it)
+    :param slicevars: a SliceVariable object
+    :returns: 1/beta.pdf(u_s; a, b)
+    """
+    if edge.lhs == goal:
+        # rules rooted by the goal symbol have probability 1 (or 0 in log-domain) and there is no slice variable for the goal symbol
+        return 0.0
+    else:
+        sym, start, end = parse_annotated_nonterminal(edge.lhs)
+        return slicevars.weight(sym, start, end, edge.log_prob)
+
 def sliced_sample(wcfg, wfsa, root, goal, parser):
     """
     Sample a derivation given a wcfg and a wfsa, with Slice Sampling, a
@@ -98,11 +118,13 @@ def sliced_sample(wcfg, wfsa, root, goal, parser):
 
         # calculate the inside weight of the sorted forest
         logging.debug('Inside...')
-        inside_prob = sliced_inside.sliced_inside(forest, sorted_nodes, goal, parser.slice_vars)
+        # here we compute inside weights, however with a new uniform weight function over edges
+        inside_prob = inside(forest, sorted_nodes, omega=lambda edge: edge_uniform_weight(edge, goal, parser.slice_vars))
 
         logging.debug('Sampling...')
         # retrieve a random derivation, with respect to the inside weight distribution
-        gen_sampling = GeneralisedSampling(forest, inside_prob)
+        # again, we sample with respect to a uniform function over edges
+        gen_sampling = GeneralisedSampling(forest, inside_prob, omega=lambda edge: edge_uniform_weight(edge, goal, parser.slice_vars))
         d = gen_sampling.sample(goal)
 
         return d
@@ -129,7 +151,12 @@ def main(args):
 
         start = time.time()
 
-        sliced_sampling(wcfg, sentence.fsa, make_nonterminal(args.start), make_nonterminal(args.goal), args.samples, args.max, args.a, args.b, args.intersection)
+        sliced_sampling(wcfg, sentence.fsa,
+                        make_nonterminal(args.start),
+                        make_nonterminal(args.goal),
+                        args.samples, args.burn, args.max,
+                        args.a, args.b,
+                        args.intersection)
 
         end = time.time()
         print "DURATION  = ", end - start
@@ -164,8 +191,11 @@ def argparser():
     parser.add_argument('--samples',
                         type=int, default=100,
                         help='The number of samples')
+    parser.add_argument('--burn',
+                        type=int, default=0,
+                        help='The number of initial samples to discard')
     parser.add_argument('--max',
-                        type=int, default=200,
+                        type=int, default=1000,
                         help='The maximum number of iterations')
     parser.add_argument('-a',
                         type=float, nargs=2, default=[0.1, 0.3], metavar='BEFORE AFTER',

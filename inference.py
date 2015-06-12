@@ -1,12 +1,17 @@
-__author__ = 'Iason'
+"""
+:Authors: - Iason
+"""
 
 import math
 from collections import defaultdict
 
 
-def inside(forest, topsort):
+def inside(forest, topsort, omega=lambda edge: edge.log_prob):
     """
     Inside recursion.
+    :param forest: an acyclic hypergraph.
+    :param topsort: a partial ordering of the nodes in the forest.
+    :param omega: a function that computes the weight of an edge (defaults to the edge's own log probability)
     :return: a dictionary mapping a symbol to its inside weight.
     """
     inside_prob = defaultdict(float)
@@ -14,26 +19,20 @@ def inside(forest, topsort):
     # visit nodes bottom up
     for parent in topsort:
 
-        rules = forest.get(parent, frozenset())
+        incoming = forest.get(parent, frozenset())
 
         # leaves have inside weight 1
-        if not rules:
+        if not incoming:
             # log(1) = 0
             inside_prob[parent] = 0
         else:
             # log(0) = -inf
             total = -float("inf")
 
-            for rule in rules:
-                k = rule.log_prob
-
-                for child in rule.rhs:
-                    # including the rule own weight
-                    # log(a * b) = log(a) + log(b)
-                    k += inside_prob[child]
-
+            for edge in incoming:
+                w = sum((inside_prob[child] for child in edge.rhs), omega(edge))
                 # log(a) + log(b) = log(exp(a) + exp(b))
-                total = math.log(math.exp(total) + math.exp(k))
+                total = math.log(math.exp(total) + math.exp(w))
 
             inside_prob[parent] = total
 
