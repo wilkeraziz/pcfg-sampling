@@ -113,7 +113,8 @@ def read_grammar_rules(istream, transform=log):
         lhs, rhs, log_prob = line.strip().split(' ||| ')
         rhs = rhs.split()
         log_prob = transform(float(log_prob))
-        if take_log:
-            log_prob = log(log_prob)
+        # We don't need this anymore right?
+        # if take_log:
+        #     log_prob = log(log_prob)
         yield Rule(lhs, rhs, log_prob)
 
