@@ -29,10 +29,14 @@ def inside(forest, topsort, omega=lambda edge: edge.log_prob):
             # log(0) = -inf
             total = -float("inf")
 
+            # TEMPORARY: maybe there is a better (faster) solution?
+            # just leave is fot the time being
+            from mpmath import exp, log
+
             for edge in incoming:
                 w = sum((inside_prob[child] for child in edge.rhs), omega(edge))
                 # log(a) + log(b) = log(exp(a) + exp(b))
-                total = math.log(math.exp(total) + math.exp(w))
+                total = log(exp(total) + exp(w))
 
             inside_prob[parent] = total
 
