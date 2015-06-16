@@ -17,7 +17,6 @@ from inference import inside
 from generalisedSampling import GeneralisedSampling
 from symbol import parse_annotated_nonterminal, make_nonterminal
 import time
-from scipy.stats import beta
 
 
 def get_conditions(d):
@@ -134,7 +133,18 @@ def sliced_sample(root, goal, parser):
 
 
 def main(args):
+    if args.profile:
+        import cProfile
+        pr = cProfile.Profile()
+        pr.enable()
+        core(args)
+        pr.disable()
+        pr.dump_stats(args.profile)
+    else:
+        core(args)
 
+
+def core(args):
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
     else:
@@ -163,7 +173,6 @@ def main(args):
 
         end = time.time()
         print "DURATION  = ", end - start
-
 
 
 def argparser():
@@ -219,6 +228,8 @@ def argparser():
     parser.add_argument('--grammarfmt',
             type=str, default='bar', choices=['bar', 'discodop'],
             help="grammar format ('bar' is the native format)")
+    parser.add_argument('--profile',
+            help='enables profiling')
 
     return parser
 

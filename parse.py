@@ -77,7 +77,18 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='neder
 
 
 def main(args):
+    if args.profile:
+        import cProfile
+        pr = cProfile.Profile()
+        pr.enable()
+        core(args)
+        pr.disable()
+        pr.dump_stats(args.profile)
+    else:
+        core(args)
 
+
+def core(args):
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(message)s')
     else:
@@ -100,6 +111,8 @@ def main(args):
         exact_sample(wcfg, sentence.fsa, start_symbol, goal_symbol, args.samples, args.intersection)
         end = time.time()
         print "DURATION  = ", end - start
+
+
 
 
 
@@ -145,6 +158,8 @@ def argparser():
     parser.add_argument('--samples',
                         type=int, default=100,
                         help='The number of samples')
+    parser.add_argument('--profile',
+            help='enables profiling')
 
     return parser
 
