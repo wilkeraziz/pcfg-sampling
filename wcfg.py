@@ -98,7 +98,7 @@ def count_derivations(wcfg, root):
     return counts
 
 
-def read_grammar_rules(istream, transform=log):
+def read_grammar_rules(istream, transform=log, strip_quotes=False):
     """
     Reads grammar rules in cdec format.
 
@@ -111,7 +111,10 @@ def read_grammar_rules(istream, transform=log):
     """
     for line in istream:
         lhs, rhs, log_prob = line.strip().split(' ||| ')
-        rhs = rhs.split()
+        if not strip_quotes:
+            rhs = rhs.split()
+        else:
+            rhs = [s[1:-1] if s.startswith("'") and s.endswith("'") else s for s in rhs.split()]
         log_prob = transform(float(log_prob))
         yield Rule(lhs, rhs, log_prob)
 

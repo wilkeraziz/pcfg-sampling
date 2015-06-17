@@ -37,6 +37,7 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='neder
     logging.debug('Parsing...')
     forest = parser.do(root, goal)
 
+
     if not forest:
         print 'NO PARSE FOUND'
         return False
@@ -103,14 +104,17 @@ def core(args):
 
     start_symbol = make_nonterminal(args.start)
     goal_symbol = make_nonterminal(args.goal)
-    for input_str in args.input:
-        sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol)
+    jobs = [input_str.strip() for input_str in args.input]
+
+    for jid, input_str in enumerate(jobs, 1):
+        sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol, split_bars=args.split_input)
+        logging.info('[%d/%d] Parsing %d words: %s', jid, len(jobs), len(sentence), ' '.join(sentence.words))
         wcfg.update(extra_rules)
 
         start = time.time()
         exact_sample(wcfg, sentence.fsa, start_symbol, goal_symbol, args.samples, args.intersection)
         end = time.time()
-        print "DURATION  = ", end - start
+        logging.info("Duration %ss", end - start)
 
 
 
@@ -132,6 +136,9 @@ def argparser():
     parser.add_argument('--intersection',
             type=str, default='nederhof', choices=['nederhof', 'earley'],
             help="intersection algorithm (nederhof: bottom-up; earley: top-down)")
+    parser.add_argument('--split-input',
+            action='store_true',
+            help='assumes the input is given separated by triple bars')
     parser.add_argument('--log',
             action='store_true',
             help='applies the log transform to the probabilities of the rules')
@@ -142,7 +149,7 @@ def argparser():
             type=str, default='GOAL', 
             help="goal symbol for intersection")
     parser.add_argument('--grammarfmt',
-            type=str, default='bar', choices=['bar', 'discodop'],
+            type=str, default='bar', choices=['bar', 'discodop', 'milos'],
             help="grammar format ('bar' is the native format)")
     parser.add_argument('--unkmodel',
             type=str, default=None,

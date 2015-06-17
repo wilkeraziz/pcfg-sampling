@@ -21,6 +21,9 @@ class Sentence(object):
         self._signatures = tuple(signatures)
         self._fsa = fsa
 
+    def __len__(self):
+        return len(self._words)
+
     @property
     def words(self):
         return self._words
@@ -37,15 +40,19 @@ class Sentence(object):
         return ' '.join(self.words)
 
 
-def make_sentence(input_str, lexicon, unkmodel=None, default_symbol=DEFAULT_SYMBOL, one=0.0):
-    words = input_str.split()
+def make_sentence(input_str, lexicon, unkmodel=None, default_symbol=DEFAULT_SYMBOL, one=0.0, split_bars=False):
+    if split_bars:
+        words = input_str.split(' ||| ')[0].split()  # this gets rid of whatever follows the triple bars
+    else:
+        words = input_str.split()
     signatures = list(words)
     extra_rules = []
     for i, word in enumerate(words):
-        if word not in lexicon and unkmodel is not None:
+        terminal = make_terminal(word)
+        if terminal not in lexicon and unkmodel is not None:
             # special treatment for unknown words
                 if unkmodel == PASSTHROUGH:
-                    extra_rules.append(Rule(make_nonterminal(default_symbol), [make_terminal(word)], one))
+                    extra_rules.append(Rule(make_nonterminal(default_symbol), [terminal], one))
                     logging.debug('Passthrough rule for %s: %s', word, extra_rules[-1])
                 else:
                     if unkmodel == STFDBASE:

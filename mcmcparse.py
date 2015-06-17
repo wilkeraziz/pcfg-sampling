@@ -42,6 +42,22 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn
         raise NotImplementedError('I do not know this algorithm: %s' % intersection)
     
     samples = []
+
+    # a strategy to obtain an initial set of conditions with the reordering grammar is to "clean up" the grammar
+    # and obtain a first derivation
+    # for instance, we could cleanup all rules whose LHS represents a permutation with more than 2 symbols
+    # def initialise(cfg):
+    #   smaller = a CFG based on the input cfg, but with fewer rules
+    #   forest = parse(smaller, wfsa)
+    #   tsort = topsort(forest)
+    #   inside = inside(forest, tsort)
+    #   d = sample(forest, inside, n=1)
+    #   return make_conditions(d)
+    #
+    # initial_conditions = initialise(wcfg, wfsa)
+    #
+    # slice_vars = SliceVariable(a=a[1], b=b[1], conditions=initial_conditions)
+
     slice_vars = SliceVariable(a=a[0], b=b[0])
     it = 0
     while len(samples) < n_samples and it < max_iterations:
@@ -158,8 +174,11 @@ def core(args):
 
     logging.info(' %d rules', len(wcfg))
 
-    for input_str in args.input:
-        sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol)
+    jobs = [input_str.strip() for input_str in args.input]
+
+    for jid, input_str in enumerate(jobs, 1):
+        sentence, extra_rules = make_sentence(input_str, wcfg.terminals, args.unkmodel, args.default_symbol, split_bars=args.split_input)
+        logging.info('[%d/%d] Parsing %d words: %s', jid, len(jobs), len(sentence), ' '.join(sentence.words))
         wcfg.update(extra_rules)
 
         start = time.time()
@@ -172,7 +191,7 @@ def core(args):
                         args.intersection)
 
         end = time.time()
-        print "DURATION  = ", end - start
+        logging.info("Duration %ss", end - start)
 
 
 def argparser():
@@ -188,6 +207,9 @@ def argparser():
     parser.add_argument('input', nargs='?',
             type=argparse.FileType('r'), default=sys.stdin,
             help='input corpus (one sentence per line)')
+    parser.add_argument('--split-input',
+            action='store_true',
+            help='assumes the input is given separated by triple bars')
     parser.add_argument('--intersection',
             type=str, default='nederhof', choices=['nederhof', 'earley'],
             help="intersection algorithm (nederhof: bottom-up; earley: top-down)")
@@ -226,7 +248,7 @@ def argparser():
             action='store_true',
             help='increase the verbosity level')
     parser.add_argument('--grammarfmt',
-            type=str, default='bar', choices=['bar', 'discodop'],
+            type=str, default='bar', choices=['bar', 'discodop', 'milos'],
             help="grammar format ('bar' is the native format)")
     parser.add_argument('--profile',
             help='enables profiling')
