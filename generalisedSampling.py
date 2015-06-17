@@ -3,8 +3,8 @@
 """
 
 from symbol import is_nonterminal
-import math
 import random
+import numpy as np
 
 
 class GeneralisedSampling(object):
@@ -79,11 +79,12 @@ class GeneralisedSampling(object):
 
         # select an edge randomly with respect to the distribution of the edges
         # threshold for selecting an edge
-        threshold = math.log(random.uniform(0, math.exp(ip)))
+        threshold = np.log(random.uniform(0, np.exp(ip)))
 
         acc = -float("inf")
         for e in incoming:
-            acc = math.log(math.exp(acc) + math.exp(self.get_edge_inside(e)))
+            # acc = math.log(math.exp(acc) + math.exp(self.get_edge_inside(e)))
+            acc = np.logaddexp(acc, self.get_edge_inside(e))
             if acc > threshold:
                 return e
 
