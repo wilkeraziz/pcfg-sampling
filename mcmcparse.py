@@ -59,6 +59,8 @@ def initialise(wcfg, wfsa, root, goal, intersection):
     for line in wcfg:
         if 0 < permutation_length(line.lhs) <= 2:
             smaller.add(line)
+        elif line.lhs == root:
+            smaller.add(line)
 
     if intersection == 'nederhof':
         init_parser = Nederhof(smaller, wfsa)
