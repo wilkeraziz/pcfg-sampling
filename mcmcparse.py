@@ -17,6 +17,9 @@ from inference import inside
 from generalisedSampling import GeneralisedSampling
 from symbol import parse_annotated_nonterminal, make_nonterminal
 import time
+import re
+
+from wcfg import WCFG
 
 
 def get_conditions(d):
@@ -27,7 +30,46 @@ def get_conditions(d):
     return {parse_annotated_nonterminal(rule.lhs): rule.log_prob for rule in d}
 
 
-def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn=100, max_iterations=1000, a=[0.1, 0.1], b=[1.0, 1.0], intersection='nederhof'):
+def permutation_length(nonterminal):
+    """
+    :param nonterminal: a non-terminal of the form: '[P1234*2_1]
+    :return: the length of the permutations within the non-terminal
+    """
+
+    NT_PERMUTATION = re.compile(r'P([0-9]+)')
+    matches = NT_PERMUTATION.search(nonterminal)
+    if matches is not None:
+        assert matches is not None, 'bad format %s' % nonterminal
+        permutation = matches.group(1)
+        return len(permutation)
+    else:
+        return None
+
+
+def initialise(wcfg, wfsa, root, goal, parser_type, slicevars):
+    """
+    Calculate a first derivation based on a simpler (thus smaller/faster) version of the grammar
+    Thereby determining the initial conditions.
+    Only applicable with the 'Milos' grammar format, i.e. non-terminals have the form: '[P1234*2_1]'
+    """
+    smaller = WCFG([])
+
+    for line in wcfg:
+        if permutation_length(line.lhs) <= 2:
+            smaller.add(line)
+
+    d = None
+    while d is None:
+        d = sliced_sample(root, goal, parser_type(smaller, wfsa, slicevars))
+
+        if d is None:
+            slicevars.reset()
+
+    return get_conditions(d)
+
+
+def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn=100, max_iterations=1000, a=[0.1, 0.1],
+                    b=[1.0, 1.0], intersection='nederhof', grammarfmt='milos'):
     """
     Sample N derivations in maximum K iterations with Slice Sampling
     """
@@ -43,22 +85,17 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn
     
     samples = []
 
-    # a strategy to obtain an initial set of conditions with the reordering grammar is to "clean up" the grammar
-    # and obtain a first derivation
-    # for instance, we could cleanup all rules whose LHS represents a permutation with more than 2 symbols
-    # def initialise(cfg):
-    #   smaller = a CFG based on the input cfg, but with fewer rules
-    #   forest = parse(smaller, wfsa)
-    #   tsort = topsort(forest)
-    #   inside = inside(forest, tsort)
-    #   d = sample(forest, inside, n=1)
-    #   return make_conditions(d)
-    #
-    # initial_conditions = initialise(wcfg, wfsa)
-    #
-    # slice_vars = SliceVariable(a=a[1], b=b[1], conditions=initial_conditions)
-
     slice_vars = SliceVariable(a=a[0], b=b[0])
+
+    # the initial conditions function is only implemented for the 'milos' grammarformat,
+    # this could be extended to other grammar formats as well.
+    if grammarfmt == 'milos':
+        # calculate the initial conditions (first derivation (seed))
+        initial_conditions = initialise(wcfg, wfsa, root, goal, parser_type, slice_vars)
+
+        # begin with sampling with respect to the initial conditions
+        slice_vars = SliceVariable(a=a[1], b=b[1], conditions=initial_conditions)
+
     it = 0
     while len(samples) < n_samples and it < max_iterations:
         it += 1
@@ -188,7 +225,8 @@ def core(args):
                         make_nonterminal(args.goal),
                         args.samples, args.burn, args.max,
                         args.a, args.b,
-                        args.intersection)
+                        args.intersection,
+                        args.grammarfmt)
 
         end = time.time()
         logging.info("Duration %ss", end - start)

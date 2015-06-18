@@ -56,17 +56,6 @@ class SliceVariable(object):
             raise ValueError('I do not expect to reweight a rule for an unseen state: %s' % str(state))
 
         if theta > u:
-            """ TEMPORARY, if you return the 'theta' instead, sliced_inside will act
-            like the normal inside algorithm, which results in the same accuracy as MC sampling
-            this means that the 'bug' appears to be in the use of the BETA.PDF distribution function..."""
-            # return theta
-
-            """ TEMPORARY, for debugging the: Theta | Us | Beta """
-            # temp_beta = beta.logpdf(math.exp(u), self.a, self.b)
-            # logging.debug("\nTheta = %s \nUs = %s \nBETA = %s, beta %s times > u --> %s\n-log(Beta) = %s\n\n",
-            #               math.exp(theta), math.exp(u), math.exp(temp_beta), math.exp(temp_beta) / math.exp(u), temp_beta > u, math.exp(- temp_beta))
-            # return - temp_beta
-
             return - beta.logpdf(math.exp(u), self.a, self.b)
 
         else:

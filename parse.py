@@ -37,7 +37,6 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='neder
     logging.debug('Parsing...')
     forest = parser.do(root, goal)
 
-
     if not forest:
         print 'NO PARSE FOUND'
         return False
