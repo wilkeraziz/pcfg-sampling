@@ -59,7 +59,7 @@ def initialise(wcfg, wfsa, root, goal, intersection):
     for line in wcfg:
         if 0 < permutation_length(line.lhs) <= 2:
             smaller.add(line)
-        elif line.lhs == root:
+        elif line.lhs == root or line.lhs == '[UNK]':
             smaller.add(line)
 
     if intersection == 'nederhof':
