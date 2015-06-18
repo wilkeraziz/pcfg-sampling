@@ -20,6 +20,8 @@ import time
 import re
 
 from wcfg import WCFG
+from earley import Earley
+from nederhof import Nederhof
 
 
 def get_conditions(d):
@@ -43,29 +45,52 @@ def permutation_length(nonterminal):
         permutation = matches.group(1)
         return len(permutation)
     else:
-        return None
+        return 0
 
 
-def initialise(wcfg, wfsa, root, goal, parser_type, slicevars):
+def initialise(wcfg, wfsa, root, goal, intersection):
     """
     Calculate a first derivation based on a simpler (thus smaller/faster) version of the grammar
     Thereby determining the initial conditions.
-    Only applicable with the 'Milos' grammar format, i.e. non-terminals have the form: '[P1234*2_1]'
+    Only applicable with the 'milos' grammar format, i.e. non-terminals have the form: '[P1234*2_1]'
     """
     smaller = WCFG([])
 
     for line in wcfg:
-        if permutation_length(line.lhs) <= 2:
+        if 0 < permutation_length(line.lhs) <= 2:
             smaller.add(line)
 
-    d = None
-    while d is None:
-        d = sliced_sample(root, goal, parser_type(smaller, wfsa, slicevars))
+    if intersection == 'nederhof':
+        init_parser = Nederhof(smaller, wfsa)
+        logging.info('Using Nederhof parser')
+    elif intersection == 'earley':
+        init_parser = Earley(smaller, wfsa)
+        logging.info('Using Earley parser')
+    else:
+        raise NotImplementedError('I do not know this algorithm: %s' % intersection)
 
-        if d is None:
-            slicevars.reset()
+    logging.debug('Init Parsing...')
+    init_forest = init_parser.do(root, goal)
 
-    return get_conditions(d)
+    if not init_forest:
+        print 'NO PARSE FOUND'
+        return {}
+    else:
+        logging.debug('Forest: rules=%d', len(init_forest))
+
+        logging.debug('Init Topsorting...')
+        # sort the forest
+        sorted_nodes = top_sort(init_forest)
+
+        # calculate the inside weight of the sorted forest
+        logging.debug('Init Inside...')
+        init_inside_prob = inside(init_forest, sorted_nodes)
+
+        logging.debug('Init Sampling...')
+        gen_sampling = GeneralisedSampling(init_forest, init_inside_prob)
+        init_d = gen_sampling.sample(goal)
+
+    return get_conditions(init_d)
 
 
 def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn=100, max_iterations=1000, a=[0.1, 0.1],
@@ -85,16 +110,16 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn
     
     samples = []
 
-    slice_vars = SliceVariable(a=a[0], b=b[0])
-
     # the initial conditions function is only implemented for the 'milos' grammarformat,
     # this could be extended to other grammar formats as well.
     if grammarfmt == 'milos':
-        # calculate the initial conditions (first derivation (seed))
-        initial_conditions = initialise(wcfg, wfsa, root, goal, parser_type, slice_vars)
+        # calculate the initial conditions (first derivation (i.e. seed))
+        initial_conditions = initialise(wcfg, wfsa, root, goal, intersection)
 
         # begin with sampling with respect to the initial conditions
         slice_vars = SliceVariable(a=a[1], b=b[1], conditions=initial_conditions)
+    else:
+        slice_vars = SliceVariable(a=a[0], b=b[0])
 
     it = 0
     while len(samples) < n_samples and it < max_iterations:
