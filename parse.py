@@ -2,13 +2,14 @@
 :Authors: - Iason
 """
 
+import re
 import time
 import argparse
 import logging
 import sys
 import math
 from reader import load_grammar
-from collections import Counter
+from collections import Counter, defaultdict
 from symbol import make_nonterminal
 from earley import Earley
 from nederhof import Nederhof
@@ -16,6 +17,25 @@ from topsort import top_sort
 from sentence import make_sentence
 from inference import inside
 from generalisedSampling import GeneralisedSampling
+from nltk import Tree
+
+
+def inlinetree(t):
+    s = str(t).replace('\n','')
+    return re.sub(' +', ' ', s)
+
+
+def make_nltk_tree(derivation):
+    """
+    Recursively constructs an nlt Tree from a list of rules.
+    @param top: index to the top rule (0 and -1 are the most common values)
+    """
+    d = defaultdict(None, ((r.lhs, r) for r in derivation))
+
+    def make_tree(sym):
+        r = d[sym]
+        return Tree(str(r.lhs), (str(child) if child not in d else make_tree(child) for child in r.rhs))
+    return make_tree(derivation[0].lhs)
 
 
 def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='nederhof'):
@@ -71,9 +91,9 @@ def exact_sample(wcfg, wfsa, root='[S]', goal='[GOAL]', n=1, intersection='neder
             score = sum(r.log_prob for r in d)
             prob = math.exp(score - inside_prob[goal])
             print '# n=%s estimate=%s prob=%s score=%s' % (n, float(n)/len(samples), prob, score)
-            for r in d:
-                print r
-            print 
+            tree = make_nltk_tree(d)
+            inline_tree = inlinetree(tree)
+            print inline_tree, "\n"
 
 
 def main(args):

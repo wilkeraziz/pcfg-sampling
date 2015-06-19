@@ -18,10 +18,28 @@ from generalisedSampling import GeneralisedSampling
 from symbol import parse_annotated_nonterminal, make_nonterminal
 import time
 import re
-
 from wcfg import WCFG
 from earley import Earley
 from nederhof import Nederhof
+from nltk import Tree
+
+
+def inlinetree(t):
+    s = str(t).replace('\n','')
+    return re.sub(' +', ' ', s)
+
+
+def make_nltk_tree(derivation):
+    """
+    Recursively constructs an nlt Tree from a list of rules.
+    @param top: index to the top rule (0 and -1 are the most common values)
+    """
+    d = defaultdict(None, ((r.lhs, r) for r in derivation))
+
+    def make_tree(sym):
+        r = d[sym]
+        return Tree(str(r.lhs), (str(child) if child not in d else make_tree(child) for child in r.rhs))
+    return make_tree(derivation[0].lhs)
 
 
 def get_conditions(d):
@@ -56,6 +74,7 @@ def initialise(wcfg, wfsa, root, goal, intersection):
     """
     smaller = WCFG([])
 
+    logging.debug('Creating a smaller grammar for initial conditions...')
     for line in wcfg:
         if 0 < permutation_length(line.lhs) <= 2:
             smaller.add(line)
@@ -64,10 +83,8 @@ def initialise(wcfg, wfsa, root, goal, intersection):
 
     if intersection == 'nederhof':
         init_parser = Nederhof(smaller, wfsa)
-        logging.info('Using Nederhof parser')
     elif intersection == 'earley':
         init_parser = Earley(smaller, wfsa)
-        logging.info('Using Earley parser')
     else:
         raise NotImplementedError('I do not know this algorithm: %s' % intersection)
 
@@ -115,6 +132,7 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn
     # the initial conditions function is only implemented for the 'milos' grammarformat,
     # this could be extended to other grammar formats as well.
     if grammarfmt == 'milos':
+        logging.debug('Calculating initial conditions...')
         # calculate the initial conditions (first derivation (i.e. seed))
         initial_conditions = initialise(wcfg, wfsa, root, goal, intersection)
 
@@ -155,11 +173,9 @@ def sliced_sampling(wcfg, wfsa, root='[S]', goal='[GOAL]', n_samples=100, n_burn
     for d, n in counts.most_common():
         score = sum(r.log_prob for r in d)
         print '# n=%s estimate=%s score=%s' % (n, float(n)/len(samples), score)
-        for r in d:
-            print r
-        print 
-
-    # print "\nCount failed derivations: ", it - sum(samples.values())
+        tree = make_nltk_tree(d)
+        inline_tree = inlinetree(tree)
+        print inline_tree, "\n"
 
 
 def edge_uniform_weight(edge, goal, slicevars):
